@@ -85,12 +85,6 @@ export function ReservaForm({
     }
   }, [checkin, checkout, valorAluguel, limpeza, desconto, comissaoMarcioPercentual])
 
-  // Enquanto o campo não for editado manualmente, ele acompanha a sugestão calculada
-  React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza sugestão com os outros campos até o usuário digitar o próprio valor
-    if (!comissaoMarcioManual) setComissaoMarcio(comissaoMarcioSugerida > 0 ? comissaoMarcioSugerida.toFixed(2) : "")
-  }, [comissaoMarcioSugerida, comissaoMarcioManual])
-
   function limparForm() {
     setHospede("")
     setCheckin("")
@@ -373,18 +367,22 @@ export function ReservaForm({
                 setComissaoMarcioManual(true)
               }}
             />
-            {comissaoMarcioManual && (
-              <InputGroupAddon align="inline-end">
-                <button
-                  type="button"
-                  title="Usar valor sugerido"
-                  onClick={() => setComissaoMarcioManual(false)}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <RotateCcw className="size-3.5" />
-                </button>
-              </InputGroupAddon>
-            )}
+            <InputGroupAddon align="inline-end">
+              <button
+                type="button"
+                title={comissaoMarcioSugerida > 0 ? `Usar sugestão de ${formatBRL(comissaoMarcioSugerida)}` : "Calcule a sugestão preenchendo o valor e as datas"}
+                onClick={() => {
+                  if (comissaoMarcioSugerida > 0) {
+                    setComissaoMarcio(comissaoMarcioSugerida.toFixed(2))
+                    setComissaoMarcioManual(true)
+                  }
+                }}
+                disabled={comissaoMarcioSugerida <= 0}
+                className="text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <RotateCcw className="size-3.5" />
+              </button>
+            </InputGroupAddon>
           </InputGroup>
         </Field>
 
@@ -413,8 +411,7 @@ export function ReservaForm({
           Adicionar Reserva
         </Button>
         <div className="font-mono text-sm tabular-nums text-muted-foreground">
-          <span className="font-semibold text-foreground">{noites}</span> noites →{" "}
-          <b className="text-foreground">{formatBRL(total)}</b>
+          <span className="font-semibold text-foreground">{noites}</span> noites → <b className="text-foreground">{formatBRL(total)}</b>
         </div>
       </div>
     </div>
