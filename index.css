@@ -1,0 +1,192 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/space-grotesk";
+@import "@fontsource-variable/inter";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+@import "@fontsource/ibm-plex-mono/700.css";
+@import "@fontsource/cinzel/600.css";
+@import "@fontsource/cinzel/700.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-heading: 'Space Grotesk Variable', 'Geist Variable', sans-serif;
+    --font-sans: 'Inter Variable', 'Geist Variable', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --font-display: 'Cinzel', serif;
+    --color-gold: var(--gold);
+    --color-gold-soft: var(--gold-soft);
+    --color-gold-foreground: var(--gold-foreground);
+    --color-airbnb: var(--airbnb);
+    --color-airbnb-soft: var(--airbnb-soft);
+    --color-booking: var(--booking);
+    --color-booking-soft: var(--booking-soft);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+    --background: #F6F3EE;
+    --foreground: #22302B;
+    --card: #FFFFFF;
+    --card-foreground: #22302B;
+    --popover: #FFFFFF;
+    --popover-foreground: #22302B;
+    --primary: #1B6B72;
+    --primary-foreground: #FFFFFF;
+    --secondary: #EFEBE2;
+    --secondary-foreground: #22302B;
+    --muted: #EFEBE2;
+    --muted-foreground: #6B7570;
+    --accent: #DCEBEC;
+    --accent-foreground: #0F4145;
+    --destructive: #B3372C;
+    --border: #E3DED2;
+    --input: #E3DED2;
+    --ring: #1B6B72;
+    --chart-1: #1B6B72;
+    --chart-2: #C9992B;
+    --chart-3: #8B5CF6;
+    --chart-4: #EC4899;
+    --chart-5: #059669;
+    --radius: 0.65rem;
+    --sidebar: #22302B;
+    --sidebar-foreground: #FFFFFF;
+    --sidebar-primary: #1B6B72;
+    --sidebar-primary-foreground: #FFFFFF;
+    --sidebar-accent: rgba(255,255,255,.08);
+    --sidebar-accent-foreground: #FFFFFF;
+    --sidebar-border: rgba(255,255,255,.14);
+    --sidebar-ring: #1B6B72;
+
+    /* Cores de marca/identidade — usadas em contextos específicos (badges de
+       plataforma, destaques dourados), não são tokens semânticos genéricos */
+    --gold: #C9992B;
+    --gold-soft: #F5E9D0;
+    --gold-foreground: #5C4413;
+    --airbnb: #FF385C;
+    --airbnb-soft: #FFE3E8;
+    --booking: #003580;
+    --booking-soft: #DCE6F5;
+}
+
+.dark {
+    --background: #161F1C;
+    --foreground: #EDEAE2;
+    --card: #1E2925;
+    --card-foreground: #EDEAE2;
+    --popover: #1E2925;
+    --popover-foreground: #EDEAE2;
+    --primary: #2A8A92;
+    --primary-foreground: #FFFFFF;
+    --secondary: #24302B;
+    --secondary-foreground: #EDEAE2;
+    --muted: #24302B;
+    --muted-foreground: #8A9691;
+    --accent: #1E3A3D;
+    --accent-foreground: #BFE4E6;
+    --destructive: #C6473A;
+    --border: rgba(255,255,255,.1);
+    --input: rgba(255,255,255,.14);
+    --ring: #2A8A92;
+    --chart-1: #2A8A92;
+    --chart-2: #C9992B;
+    --chart-3: #A78BFA;
+    --chart-4: #F472B6;
+    --chart-5: #10B981;
+    --sidebar: #121916;
+    --sidebar-foreground: #EDEAE2;
+    --sidebar-primary: #2A8A92;
+    --sidebar-primary-foreground: #FFFFFF;
+    --sidebar-accent: rgba(255,255,255,.06);
+    --sidebar-accent-foreground: #EDEAE2;
+    --sidebar-border: rgba(255,255,255,.1);
+    --sidebar-ring: #2A8A92;
+
+    --gold: #D9A93B;
+    --gold-soft: #3A2F13;
+    --gold-foreground: #F5E9D0;
+    --airbnb: #FF5A78;
+    --airbnb-soft: #3A1620;
+    --booking: #4A78C4;
+    --booking-soft: #16233A;
+}
+
+@layer utilities {
+  @keyframes stagger-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  .animate-stagger-in {
+    animation: stagger-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-stagger-in {
+      animation-duration: 1ms;
+    }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    background-image: repeating-linear-gradient(
+      135deg,
+      color-mix(in oklch, var(--foreground) 4%, transparent) 0px,
+      color-mix(in oklch, var(--foreground) 4%, transparent) 1px,
+      transparent 1px,
+      transparent 13px
+    );
+    background-attachment: fixed;
+    }
+  html {
+    @apply font-sans;
+    }
+}
