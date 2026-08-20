@@ -21,9 +21,17 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/components/ui/*": ["./*"],
+      "@/components/*": ["./*"],
+      "@/pages/*": ["./*"],
+      "@/hooks/*": ["./*"],
+      "@/lib/*": ["./*"],
+      "@/assets/*": ["./*"],
+      "@/types": ["./index.ts"]
     }
   },
-  "include": ["src"]
+  "include": ["*.ts", "*.tsx"],
+  "exclude": ["vite.config.ts"]
 }
