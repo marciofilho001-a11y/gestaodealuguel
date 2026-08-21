@@ -1,6 +1,6 @@
 import * as React from "react"
 import { BrowserRouter, Route, Routes, useNavigate } from "react-router-dom"
-import { Toaster } from "@/components/ui/sonner"
+import { Toaster } from "@/components/ui/toaster"
 
 import { AppSidebar } from "@/components/app-sidebar"
 import { CasasDialog } from "@/components/casas-dialog"

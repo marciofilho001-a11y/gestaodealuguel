@@ -85,6 +85,12 @@ export function ReservaForm({
     }
   }, [checkin, checkout, valorAluguel, limpeza, desconto, comissaoMarcioPercentual])
 
+  React.useEffect(() => {
+    // Enquanto o usuário não digitar manualmente na comissão, ela acompanha a sugestão.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza campo com o cálculo, não é estado externo
+    if (!comissaoMarcioManual) setComissaoMarcio(comissaoMarcioSugerida > 0 ? comissaoMarcioSugerida.toFixed(2) : "")
+  }, [comissaoMarcioSugerida, comissaoMarcioManual])
+
   function limparForm() {
     setHospede("")
     setCheckin("")
