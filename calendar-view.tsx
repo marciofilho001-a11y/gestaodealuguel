@@ -39,26 +39,32 @@ function ReservaDayCard({ reserva, casas, modoTodasCasas, selected, onSelect }: 
       type="button"
       onClick={onSelect}
       className={cn(
-        "flex w-full flex-col items-start gap-0.5 rounded-lg border p-1.5 text-left leading-tight transition-colors",
+        "flex w-full min-w-0 flex-col items-start gap-0.5 rounded-lg border p-2 text-left leading-tight transition-colors",
         selected
           ? "border-primary bg-primary/10 ring-1 ring-primary"
           : "border-border/70 bg-card hover:bg-accent/40"
       )}
     >
-      <div className="flex w-full items-center gap-1.5">
+      <div className="flex w-full min-w-0 items-center gap-1.5">
         <GuestAvatar
           nome={reserva.hospede || "?"}
           casas={casas}
           casaId={reserva.casa_id}
           cor={cor}
           size="sm"
-          className="size-5"
+          className="size-5 shrink-0"
         />
-        <span className="truncate text-[11px] font-semibold">{reserva.hospede || "(sem nome)"}</span>
+        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold">{reserva.hospede || "(sem nome)"}</span>
       </div>
-      <span className="truncate text-[10px] text-muted-foreground">Check-in: {formatDate(reserva.checkin)}</span>
-      <span className="truncate text-[10px] text-muted-foreground">Check-out: {formatDate(reserva.checkout)}</span>
-      <span className="truncate font-mono text-[11px] font-bold text-primary">{formatBRL(reserva.valor_total)}</span>
+      <span className="w-full min-w-0 truncate text-[10px] text-muted-foreground">
+        Check-in: {formatDate(reserva.checkin)}
+      </span>
+      <span className="w-full min-w-0 truncate text-[10px] text-muted-foreground">
+        Check-out: {formatDate(reserva.checkout)}
+      </span>
+      <span className="w-full min-w-0 truncate font-mono text-[11px] font-bold text-primary">
+        {formatBRL(reserva.valor_total)}
+      </span>
     </button>
   )
 }
@@ -112,7 +118,7 @@ export function CalendarView({
             <div
               key={i}
               className={cn(
-                "flex min-h-16 flex-col gap-1 rounded-lg p-1.5 text-[11.5px]",
+                "flex min-h-48 min-w-0 flex-col gap-1 rounded-lg p-1.5 text-[11.5px]",
                 dia.outMonth ? "text-muted-foreground/40" : "text-foreground",
                 dia.isToday && "bg-accent/40 ring-1 ring-primary/40"
               )}

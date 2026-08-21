@@ -109,37 +109,39 @@
 }
 
 .dark {
-    --background: #161F1C;
-    --foreground: #EDEAE2;
-    --card: #1E2925;
-    --card-foreground: #EDEAE2;
-    --popover: #1E2925;
-    --popover-foreground: #EDEAE2;
-    --primary: #2A8A92;
+    /* Paleta neutra (zinc) — sem tom esverdeado/petróleo; o acento de marca
+       (teal) fica restrito a botões, badges e destaques, nunca no fundo. */
+    --background: #09090B;
+    --foreground: #FAFAFA;
+    --card: #18181B;
+    --card-foreground: #FAFAFA;
+    --popover: #18181B;
+    --popover-foreground: #FAFAFA;
+    --primary: #0D9488;
     --primary-foreground: #FFFFFF;
-    --secondary: #24302B;
-    --secondary-foreground: #EDEAE2;
-    --muted: #24302B;
-    --muted-foreground: #8A9691;
-    --accent: #1E3A3D;
-    --accent-foreground: #BFE4E6;
-    --destructive: #C6473A;
+    --secondary: #27272A;
+    --secondary-foreground: #FAFAFA;
+    --muted: #27272A;
+    --muted-foreground: #A1A1AA;
+    --accent: #134E4A;
+    --accent-foreground: #5EEAD4;
+    --destructive: #DC2626;
     --border: rgba(255,255,255,.1);
     --input: rgba(255,255,255,.14);
-    --ring: #2A8A92;
-    --chart-1: #2A8A92;
+    --ring: #0D9488;
+    --chart-1: #0D9488;
     --chart-2: #C9992B;
     --chart-3: #A78BFA;
     --chart-4: #F472B6;
     --chart-5: #10B981;
-    --sidebar: #121916;
-    --sidebar-foreground: #EDEAE2;
-    --sidebar-primary: #2A8A92;
+    --sidebar: #09090B;
+    --sidebar-foreground: #FAFAFA;
+    --sidebar-primary: #0D9488;
     --sidebar-primary-foreground: #FFFFFF;
     --sidebar-accent: rgba(255,255,255,.06);
-    --sidebar-accent-foreground: #EDEAE2;
+    --sidebar-accent-foreground: #FAFAFA;
     --sidebar-border: rgba(255,255,255,.1);
-    --sidebar-ring: #2A8A92;
+    --sidebar-ring: #0D9488;
 
     --gold: #D9A93B;
     --gold-soft: #3A2F13;
