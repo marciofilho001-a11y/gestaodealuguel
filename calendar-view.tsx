@@ -1,87 +1,76 @@
 import * as React from "react"
-import { Pencil } from "lucide-react"
 
-import { AvatarGroup, AvatarGroupCount } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Badge } from "@/components/ui/badge"
 import { GuestAvatar } from "@/components/guest-avatar"
-import { PlatformIcon } from "@/components/platform-icon"
 import { corDaCasa } from "@/lib/colors"
-import { calcularNoites, formatBRL, formatDate } from "@/lib/format"
-import { PLATFORM_BADGE, PLATFORM_COLOR } from "@/lib/platform"
+import { formatBRL, formatDate } from "@/lib/format"
+import { PLATFORM_COLOR } from "@/lib/platform"
 import { cn } from "@/lib/utils"
 import type { Casa, Reserva } from "@/types"
 
 const DOWS = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"]
+// Quantos cartões de reserva mostrar antes de resumir em "+N"
+const MAX_CARDS_POR_DIA = 2
 
 interface CalendarViewProps {
   casas: Casa[]
   reservasCasa: Reserva[]
   modoTodasCasas: boolean
   mesAtual: Date
-  onEditReserva: (id: number) => void
+  selectedReservaId: number | null
+  onSelectReserva: (id: number) => void
 }
 
-interface ReservaPopoverContentProps {
+interface ReservaDayCardProps {
   reserva: Reserva
-  nomeCasa: string
   casas: Casa[]
-  onEdit: () => void
+  modoTodasCasas: boolean
+  selected: boolean
+  onSelect: () => void
 }
 
-function ReservaPopoverContent({ reserva, nomeCasa, casas, onEdit }: ReservaPopoverContentProps) {
-  const noites = calcularNoites(reserva.checkin, reserva.checkout)
-  const statusLabel =
-    { confirmada: "Confirmada", aguardando_pagamento: "Aguardando Pagamento", cancelada: "Cancelada" }[
-      reserva.status || "confirmada"
-    ] || reserva.status
+function ReservaDayCard({ reserva, casas, modoTodasCasas, selected, onSelect }: ReservaDayCardProps) {
+  const cor = modoTodasCasas
+    ? corDaCasa(casas, reserva.casa_id)
+    : PLATFORM_COLOR[reserva.plataforma] || PLATFORM_COLOR.Outro
 
   return (
-    <div className="w-64 space-y-2.5">
-      <Badge variant="outline" className={cn("gap-1.5", PLATFORM_BADGE[reserva.plataforma] || PLATFORM_BADGE.Outro)}>
-        <PlatformIcon plataforma={reserva.plataforma} size="sm" />
-        {reserva.plataforma}
-      </Badge>
-      <div className="flex items-center gap-2">
-        <GuestAvatar nome={reserva.hospede || "?"} casas={casas} casaId={reserva.casa_id} />
-        <div className="font-heading text-[15px] font-bold">{reserva.hospede || "(sem nome)"}</div>
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "flex w-full flex-col items-start gap-0.5 rounded-md border p-1 text-left leading-tight transition-colors",
+        selected
+          ? "border-primary bg-primary/10 ring-1 ring-primary"
+          : "border-border/70 bg-card hover:bg-accent/40"
+      )}
+    >
+      <div className="flex w-full items-center gap-1">
+        <GuestAvatar
+          nome={reserva.hospede || "?"}
+          casas={casas}
+          casaId={reserva.casa_id}
+          cor={cor}
+          size="sm"
+          className="size-4"
+        />
+        <span className="truncate text-[10px] font-semibold">{reserva.hospede || "(sem nome)"}</span>
       </div>
-      <dl className="space-y-1 text-xs">
-        <div className="flex justify-between text-muted-foreground">
-          <dt>Casa</dt>
-          <dd className="font-medium text-foreground">{nomeCasa}</dd>
-        </div>
-        <div className="flex justify-between text-muted-foreground">
-          <dt>Check-in</dt>
-          <dd className="font-mono font-medium text-foreground">{formatDate(reserva.checkin)}</dd>
-        </div>
-        <div className="flex justify-between text-muted-foreground">
-          <dt>Check-out</dt>
-          <dd className="font-mono font-medium text-foreground">{formatDate(reserva.checkout)}</dd>
-        </div>
-        <div className="flex justify-between text-muted-foreground">
-          <dt>Noites</dt>
-          <dd className="font-mono font-medium tabular-nums text-foreground">{noites}</dd>
-        </div>
-        <div className="flex justify-between text-muted-foreground">
-          <dt>Status</dt>
-          <dd className="font-medium text-foreground">{statusLabel}</dd>
-        </div>
-      </dl>
-      <div className="border-t border-border pt-2 font-mono text-base font-bold tabular-nums text-primary">
-        {formatBRL(reserva.valor_total)}
-      </div>
-      <Button size="sm" className="w-full" onClick={onEdit}>
-        <Pencil data-icon="inline-start" />
-        Editar Reserva
-      </Button>
-    </div>
+      <span className="truncate text-[9px] text-muted-foreground">Check-in: {formatDate(reserva.checkin)}</span>
+      <span className="truncate text-[9px] text-muted-foreground">Check-out: {formatDate(reserva.checkout)}</span>
+      <span className="truncate font-mono text-[9.5px] font-bold text-primary">{formatBRL(reserva.valor_total)}</span>
+    </button>
   )
 }
 
-export function CalendarView({ casas, reservasCasa, modoTodasCasas, mesAtual, onEditReserva }: CalendarViewProps) {
+export function CalendarView({
+  casas,
+  reservasCasa,
+  modoTodasCasas,
+  mesAtual,
+  selectedReservaId,
+  onSelectReserva,
+}: CalendarViewProps) {
   const dias = React.useMemo(() => {
     const ano = mesAtual.getFullYear()
     const mes = mesAtual.getMonth()
@@ -90,21 +79,19 @@ export function CalendarView({ casas, reservasCasa, modoTodasCasas, mesAtual, on
     inicioGrid.setDate(primeiroDia.getDate() - primeiroDia.getDay())
     const hoje = new Date()
     hoje.setHours(0, 0, 0, 0)
+    const ativas = reservasCasa.filter((r) => r.status !== "cancelada")
 
     return Array.from({ length: 42 }, (_, i) => {
       const d = new Date(inicioGrid)
       d.setDate(inicioGrid.getDate() + i)
-      const ocupantes = reservasCasa.filter((r) => {
-        if (r.status === "cancelada") return false
-        const ci = new Date(r.checkin)
-        const co = new Date(r.checkout)
-        return d >= ci && d < co
-      })
+      // Cada reserva aparece uma única vez, no dia do check-in — evita
+      // repetir o mesmo cartão em todos os dias da estadia.
+      const checkins = ativas.filter((r) => new Date(r.checkin).getTime() === d.getTime())
       return {
         data: d,
         outMonth: d.getMonth() !== mes,
         isToday: d.getTime() === hoje.getTime(),
-        ocupantes,
+        checkins,
       }
     })
   }, [mesAtual, reservasCasa])
@@ -122,70 +109,31 @@ export function CalendarView({ casas, reservasCasa, modoTodasCasas, mesAtual, on
             <div
               key={i}
               className={cn(
-                "flex aspect-square flex-col items-center gap-0.5 rounded-lg p-1 text-[11.5px]",
+                "flex min-h-16 flex-col gap-1 rounded-lg p-1.5 text-[11.5px]",
                 dia.outMonth ? "text-muted-foreground/40" : "text-foreground",
-                dia.isToday && "bg-accent font-bold text-accent-foreground ring-1 ring-primary/40"
+                dia.isToday && "bg-accent/40 ring-1 ring-primary/40"
               )}
             >
-              <span>{dia.data.getDate()}</span>
-              <div className="flex w-full flex-1 items-center justify-center px-0.5">
-                {modoTodasCasas ? (
-                  dia.ocupantes.length > 0 && (
-                    <AvatarGroup>
-                      {dia.ocupantes.slice(0, 3).map((r) => (
-                        <Popover key={r.id}>
-                          <PopoverTrigger asChild>
-                            <button className="rounded-full transition-transform hover:z-10 hover:scale-110">
-                              <GuestAvatar
-                                nome={r.hospede || "?"}
-                                casas={casas}
-                                casaId={r.casa_id}
-                                size="sm"
-                                className="size-5"
-                              />
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-3" align="center">
-                            <ReservaPopoverContent
-                              reserva={r}
-                              nomeCasa={casas.find((c) => c.id === r.casa_id)?.nome || ""}
-                              casas={casas}
-                              onEdit={() => onEditReserva(r.id)}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      ))}
-                      {dia.ocupantes.length > 3 && (
-                        <AvatarGroupCount className="size-5 text-[9px]">+{dia.ocupantes.length - 3}</AvatarGroupCount>
-                      )}
-                    </AvatarGroup>
-                  )
-                ) : (
-                  dia.ocupantes[0] && (
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button className="rounded-full transition-transform hover:scale-110">
-                          <GuestAvatar
-                            nome={dia.ocupantes[0].hospede || "?"}
-                            casas={casas}
-                            casaId={dia.ocupantes[0].casa_id}
-                            cor={PLATFORM_COLOR[dia.ocupantes[0].plataforma] || PLATFORM_COLOR.Outro}
-                            size="sm"
-                          />
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-3" align="center">
-                        <ReservaPopoverContent
-                          reserva={dia.ocupantes[0]}
-                          nomeCasa={casas.find((c) => c.id === dia.ocupantes[0].casa_id)?.nome || ""}
-                          casas={casas}
-                          onEdit={() => onEditReserva(dia.ocupantes[0].id)}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  )
-                )}
-              </div>
+              <span className="px-0.5 font-semibold">{dia.data.getDate()}</span>
+              {dia.checkins.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  {dia.checkins.slice(0, MAX_CARDS_POR_DIA).map((r) => (
+                    <ReservaDayCard
+                      key={r.id}
+                      reserva={r}
+                      casas={casas}
+                      modoTodasCasas={modoTodasCasas}
+                      selected={r.id === selectedReservaId}
+                      onSelect={() => onSelectReserva(r.id)}
+                    />
+                  ))}
+                  {dia.checkins.length > MAX_CARDS_POR_DIA && (
+                    <span className="px-1 text-[10px] text-muted-foreground">
+                      +{dia.checkins.length - MAX_CARDS_POR_DIA} mais
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>

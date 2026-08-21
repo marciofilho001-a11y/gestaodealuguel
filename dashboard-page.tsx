@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Home as HomeIcon } from "lucide-react"
 import { AlertasPanel } from "@/components/alertas-panel"
 import { CalendarView } from "@/components/calendar-view"
 import { NovaReservaDialog } from "@/components/nova-reserva-dialog"
+import { ReservaSelecionadaPanel } from "@/components/reserva-selecionada-panel"
 import { ReservasSection } from "@/components/reservas-section"
 import { SummaryCards } from "@/components/summary-cards"
 import { Button } from "@/components/ui/button"
@@ -29,6 +30,23 @@ export function DashboardPage({ data, onOpenCasas, onEditReserva, mesAtual, onMu
     [data.reservas, data.casaAtualId, modoTodasCasas]
   )
   const nomeMes = mesAtual.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+
+  const [selectedReservaId, setSelectedReservaId] = React.useState<number | null>(null)
+  const [highlightReservaId, setHighlightReservaId] = React.useState<number | null>(null)
+
+  // Se a reserva selecionada sumir (excluída, cancelada some da lista, etc.),
+  // esse find dá null e o painel volta sozinho pros Alertas — sem precisar
+  // de efeito nenhum pra "limpar" a seleção.
+  const reservaSelecionada = React.useMemo(
+    () => data.reservas.find((r) => r.id === selectedReservaId) ?? null,
+    [data.reservas, selectedReservaId]
+  )
+
+  function handleVerDetalhes(id: number) {
+    setHighlightReservaId(id)
+    document.getElementById(`reserva-row-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })
+    window.setTimeout(() => setHighlightReservaId((atual) => (atual === id ? null : atual)), 2000)
+  }
 
   return (
     <>
@@ -83,20 +101,33 @@ export function DashboardPage({ data, onOpenCasas, onEditReserva, mesAtual, onMu
                 reservasCasa={reservasCasa}
                 modoTodasCasas={modoTodasCasas}
                 mesAtual={mesAtual}
-                onEditReserva={onEditReserva}
+                selectedReservaId={selectedReservaId}
+                onSelectReserva={setSelectedReservaId}
               />
-              <AlertasPanel
-                reservasCasa={reservasCasa}
-                modoTodasCasas={modoTodasCasas}
-                casas={data.casas}
-                onEditReserva={onEditReserva}
-              />
+              {reservaSelecionada ? (
+                <ReservaSelecionadaPanel
+                  reserva={reservaSelecionada}
+                  casas={data.casas}
+                  onEdit={() => onEditReserva(reservaSelecionada.id)}
+                  onVerDetalhes={() => handleVerDetalhes(reservaSelecionada.id)}
+                  onCancelar={(id) => data.atualizarStatusReserva(id, "cancelada")}
+                  onFechar={() => setSelectedReservaId(null)}
+                />
+              ) : (
+                <AlertasPanel
+                  reservasCasa={reservasCasa}
+                  modoTodasCasas={modoTodasCasas}
+                  casas={data.casas}
+                  onEditReserva={onEditReserva}
+                />
+              )}
             </div>
 
             <ReservasSection
               casas={data.casas}
               reservasCasaTotal={reservasCasa}
               modoTodasCasas={modoTodasCasas}
+              highlightReservaId={highlightReservaId}
               onEdit={onEditReserva}
               onDelete={data.deletarReserva}
               onStatusChange={(id: number, status: StatusReserva) => data.atualizarStatusReserva(id, status)}

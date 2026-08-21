@@ -27,6 +27,7 @@ interface ReservasSectionProps {
   casas: Casa[]
   reservasCasaTotal: Reserva[]
   modoTodasCasas: boolean
+  highlightReservaId?: number | null
   onEdit: (id: number) => void
   onDelete: (id: number) => void
   onStatusChange: (id: number, status: StatusReserva) => void
@@ -38,6 +39,7 @@ export function ReservasSection({
   casas,
   reservasCasaTotal,
   modoTodasCasas,
+  highlightReservaId,
   onEdit,
   onDelete,
   onStatusChange,
@@ -307,7 +309,13 @@ export function ReservasSection({
           <TableBody>
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow
+                  key={row.id}
+                  id={`reserva-row-${row.original.id}`}
+                  className={cn(
+                    row.original.id === highlightReservaId && "bg-accent/50 transition-colors duration-1000"
+                  )}
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className="whitespace-nowrap">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
