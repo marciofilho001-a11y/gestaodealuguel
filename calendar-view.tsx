@@ -86,7 +86,10 @@ export function CalendarView({
       d.setDate(inicioGrid.getDate() + i)
       // Cada reserva aparece uma única vez, no dia do check-in — evita
       // repetir o mesmo cartão em todos os dias da estadia.
-      const checkins = ativas.filter((r) => new Date(r.checkin).getTime() === d.getTime())
+      // Importante: "YYYY-MM-DD" sozinho o JS interpreta como UTC, mas `d`
+      // é meia-noite no fuso local — em UTC-3 isso nunca batia e os
+      // cartões nunca apareciam. Adicionando o horário força o parse local.
+      const checkins = ativas.filter((r) => new Date(r.checkin + "T00:00:00").getTime() === d.getTime())
       return {
         data: d,
         outMonth: d.getMonth() !== mes,
