@@ -4,10 +4,33 @@ export function formatBRL(v: number | null | undefined): string {
   return "R$ " + (v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+// Sem casas decimais — usado em espaços bem apertados (cards do calendário)
+// onde ",00" só ocupa espaço sem agregar informação.
+export function formatBRLCompacto(v: number | null | undefined): string {
+  return "R$ " + Math.round(v || 0).toLocaleString("pt-BR")
+}
+
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—"
   const [y, m, d] = iso.split("-")
   return `${d}/${m}/${y.slice(2)}`
+}
+
+// "dd/mm", sem ano — usado onde o contexto já deixa o ano óbvio (ex: card
+// de reserva dentro do próprio calendário do mês).
+export function formatDiaMes(iso: string | null | undefined): string {
+  if (!iso) return "—"
+  const [, m, d] = iso.split("-")
+  return `${d}/${m}`
+}
+
+// "Adriana Negrini" -> "Adriana N." — primeiro nome + inicial do segundo,
+// pra caber em cards estreitos sem cortar o nome no meio.
+export function abreviarNome(nome: string | null | undefined): string {
+  if (!nome) return ""
+  const partes = nome.trim().split(/\s+/)
+  if (partes.length <= 1) return partes[0] || ""
+  return `${partes[0]} ${partes[1].charAt(0).toUpperCase()}.`
 }
 
 export function calcularNoites(checkin: string | null | undefined, checkout: string | null | undefined): number {

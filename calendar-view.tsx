@@ -4,7 +4,7 @@ import { DoorOpen } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { GuestAvatar } from "@/components/guest-avatar"
 import { corDaCasa } from "@/lib/colors"
-import { formatBRL, formatDate } from "@/lib/format"
+import { abreviarNome, formatBRLCompacto, formatDiaMes } from "@/lib/format"
 import { PLATFORM_COLOR } from "@/lib/platform"
 import { cn } from "@/lib/utils"
 import type { Casa, Reserva } from "@/types"
@@ -37,12 +37,16 @@ function ReservaDayCard({ reserva, casas, modoTodasCasas, selected, onSelect }: 
     ? corDaCasa(casas, reserva.casa_id)
     : PLATFORM_COLOR[reserva.plataforma] || PLATFORM_COLOR.Outro
 
+  // O dia do check-in já é a própria posição do card no grid — repetir a
+  // data de chegada aqui dentro seria redundante. Só a saída importa.
+  const nomeAbreviado = abreviarNome(reserva.hospede) || "(sem nome)"
+
   return (
     <button
       type="button"
       onClick={onSelect}
       className={cn(
-        "flex w-full min-w-0 flex-col items-start gap-0.5 rounded-lg border p-2 text-left leading-tight transition-colors",
+        "flex w-full min-w-0 flex-col items-start gap-0.5 rounded-lg border p-1.5 text-left leading-tight transition-colors",
         selected
           ? "border-primary bg-primary/10 ring-1 ring-primary"
           : "border-border/70 bg-card hover:bg-accent/40"
@@ -57,16 +61,13 @@ function ReservaDayCard({ reserva, casas, modoTodasCasas, selected, onSelect }: 
           size="sm"
           className="size-5 shrink-0"
         />
-        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold">{reserva.hospede || "(sem nome)"}</span>
+        <span className="min-w-0 flex-1 truncate text-[11px] leading-tight font-semibold">{nomeAbreviado}</span>
       </div>
-      <span className="w-full min-w-0 truncate text-[10px] text-muted-foreground">
-        Check-in: {formatDate(reserva.checkin)}
+      <span className="w-full min-w-0 truncate text-[11px] leading-tight text-muted-foreground">
+        → {formatDiaMes(reserva.checkout)}
       </span>
-      <span className="w-full min-w-0 truncate text-[10px] text-muted-foreground">
-        Check-out: {formatDate(reserva.checkout)}
-      </span>
-      <span className="w-full min-w-0 truncate font-mono text-[11px] font-bold text-primary">
-        {formatBRL(reserva.valor_total)}
+      <span className="w-full min-w-0 truncate text-[11px] leading-tight font-bold text-emerald-700 dark:text-emerald-400">
+        {formatBRLCompacto(reserva.valor_total)}
       </span>
     </button>
   )
@@ -86,15 +87,15 @@ function CheckoutBadge({ reserva, selected, onSelect }: CheckoutBadgeProps) {
       type="button"
       onClick={onSelect}
       className={cn(
-        "flex w-full min-w-0 items-center gap-1 rounded-md border px-1.5 py-1 text-left transition-colors",
+        "flex w-full min-w-0 items-center gap-1 rounded-md border p-1.5 text-left leading-tight transition-colors",
         selected
           ? "border-destructive bg-destructive/15 text-destructive ring-1 ring-destructive"
           : "border-destructive/25 bg-destructive/5 text-destructive/80 hover:bg-destructive/10"
       )}
     >
       <DoorOpen className="size-3 shrink-0" />
-      <span className="min-w-0 flex-1 truncate text-[10px] font-medium">
-        Saída: {reserva.hospede || "(sem nome)"}
+      <span className="min-w-0 flex-1 truncate text-[11px] leading-tight font-medium">
+        Saída: {abreviarNome(reserva.hospede) || "(sem nome)"}
       </span>
     </button>
   )
