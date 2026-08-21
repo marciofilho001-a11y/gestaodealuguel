@@ -1,4 +1,5 @@
 import * as React from "react"
+import { DoorOpen } from "lucide-react"
 
 import { Card, CardContent } from "@/components/ui/card"
 import { GuestAvatar } from "@/components/guest-avatar"
@@ -9,8 +10,10 @@ import { cn } from "@/lib/utils"
 import type { Casa, Reserva } from "@/types"
 
 const DOWS = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"]
-// Quantos cartões de reserva mostrar antes de resumir em "+N"
+// Quantos cartões de reserva (check-in) mostrar antes de resumir em "+N"
 const MAX_CARDS_POR_DIA = 2
+// Quantos avisos de saída (check-out) mostrar antes de resumir em "+N"
+const MAX_SAIDAS_POR_DIA = 3
 
 interface CalendarViewProps {
   casas: Casa[]
@@ -69,6 +72,34 @@ function ReservaDayCard({ reserva, casas, modoTodasCasas, selected, onSelect }: 
   )
 }
 
+interface CheckoutBadgeProps {
+  reserva: Reserva
+  selected: boolean
+  onSelect: () => void
+}
+
+// Aviso compacto de saída — deliberadamente menor e mais discreto que o
+// card de check-in, só pra sinalizar "casa libera hoje" de relance.
+function CheckoutBadge({ reserva, selected, onSelect }: CheckoutBadgeProps) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "flex w-full min-w-0 items-center gap-1 rounded-md border px-1.5 py-1 text-left transition-colors",
+        selected
+          ? "border-destructive bg-destructive/15 text-destructive ring-1 ring-destructive"
+          : "border-destructive/25 bg-destructive/5 text-destructive/80 hover:bg-destructive/10"
+      )}
+    >
+      <DoorOpen className="size-3 shrink-0" />
+      <span className="min-w-0 flex-1 truncate text-[10px] font-medium">
+        Saída: {reserva.hospede || "(sem nome)"}
+      </span>
+    </button>
+  )
+}
+
 export function CalendarView({
   casas,
   reservasCasa,
@@ -96,11 +127,15 @@ export function CalendarView({
       // é meia-noite no fuso local — em UTC-3 isso nunca batia e os
       // cartões nunca apareciam. Adicionando o horário força o parse local.
       const checkins = ativas.filter((r) => new Date(r.checkin + "T00:00:00").getTime() === d.getTime())
+      // Mesma lógica do check-in, mas pro dia de saída — permite sinalizar
+      // "casa libera hoje" mesmo quando não é o dia de chegada de ninguém.
+      const checkouts = ativas.filter((r) => new Date(r.checkout + "T00:00:00").getTime() === d.getTime())
       return {
         data: d,
         outMonth: d.getMonth() !== mes,
         isToday: d.getTime() === hoje.getTime(),
         checkins,
+        checkouts,
       }
     })
   }, [mesAtual, reservasCasa])
@@ -143,6 +178,23 @@ export function CalendarView({
                   )}
                 </div>
               )}
+              {dia.checkouts.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  {dia.checkouts.slice(0, MAX_SAIDAS_POR_DIA).map((r) => (
+                    <CheckoutBadge
+                      key={`checkout-${r.id}`}
+                      reserva={r}
+                      selected={r.id === selectedReservaId}
+                      onSelect={() => onSelectReserva(r.id)}
+                    />
+                  ))}
+                  {dia.checkouts.length > MAX_SAIDAS_POR_DIA && (
+                    <span className="px-1 text-[10px] text-muted-foreground">
+                      +{dia.checkouts.length - MAX_SAIDAS_POR_DIA} saídas
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -161,6 +213,10 @@ export function CalendarView({
                   {p}
                 </span>
               ))}
+          <span className="flex items-center gap-1.5 text-destructive/80">
+            <DoorOpen className="size-3" />
+            Saída (check-out)
+          </span>
         </div>
       </CardContent>
     </Card>

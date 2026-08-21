@@ -104,23 +104,30 @@ export function DashboardPage({ data, onOpenCasas, onEditReserva, mesAtual, onMu
                 selectedReservaId={selectedReservaId}
                 onSelectReserva={setSelectedReservaId}
               />
-              {reservaSelecionada ? (
-                <ReservaSelecionadaPanel
-                  reserva={reservaSelecionada}
-                  casas={data.casas}
-                  onEdit={() => onEditReserva(reservaSelecionada.id)}
-                  onVerDetalhes={() => handleVerDetalhes(reservaSelecionada.id)}
-                  onCancelar={(id) => data.atualizarStatusReserva(id, "cancelada")}
-                  onFechar={() => setSelectedReservaId(null)}
-                />
-              ) : (
-                <AlertasPanel
-                  reservasCasa={reservasCasa}
-                  modoTodasCasas={modoTodasCasas}
-                  casas={data.casas}
-                  onEditReserva={onEditReserva}
-                />
-              )}
+              {/* Sticky só a partir do breakpoint em que o painel vira uma
+                  coluna ao lado do calendário — em telas menores ele é só
+                  mais um bloco empilhado, sem sentido prendê-lo na rolagem.
+                  max-h + overflow-y garante que, mesmo "grudado", o próprio
+                  painel role internamente se o conteúdo for maior que a tela. */}
+              <div className="lg:sticky lg:top-16 lg:max-h-[calc(100vh-5rem)] lg:self-start lg:overflow-y-auto">
+                {reservaSelecionada ? (
+                  <ReservaSelecionadaPanel
+                    reserva={reservaSelecionada}
+                    casas={data.casas}
+                    onEdit={() => onEditReserva(reservaSelecionada.id)}
+                    onVerDetalhes={() => handleVerDetalhes(reservaSelecionada.id)}
+                    onCancelar={(id) => data.atualizarStatusReserva(id, "cancelada")}
+                    onFechar={() => setSelectedReservaId(null)}
+                  />
+                ) : (
+                  <AlertasPanel
+                    reservasCasa={reservasCasa}
+                    modoTodasCasas={modoTodasCasas}
+                    casas={data.casas}
+                    onEditReserva={onEditReserva}
+                  />
+                )}
+              </div>
             </div>
 
             <ReservasSection
