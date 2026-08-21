@@ -6,13 +6,7 @@ import { Link } from "react-router-dom"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart"
+import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip } from "@/components/ui/chart"
 import type { ChartConfig } from "@/components/ui/chart"
 import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Field, FieldLabel } from "@/components/ui/field"
@@ -57,15 +51,69 @@ function GanhosCard({ label, value, hero, index }: { label: string; value: strin
   )
 }
 
+// Paleta fixa (não segue os tokens --chart-N do tema) — série de dados tem
+// cor própria por convenção, igual em claro e escuro, em vez de herdar as
+// cores genéricas de gráfico do tema (que incluíam um rosa saturado aqui).
 const chartConfig = {
-  bruto: { label: "Bruto", color: "var(--chart-1)" },
-  liquido: { label: "Líquido", color: "var(--chart-2)" },
-  comissao: { label: "Comissão", color: "var(--chart-4)" },
+  bruto: { label: "Bruto", color: "#6366f1" }, // índigo
+  liquido: { label: "Líquido", color: "#10b981" }, // esmeralda
+  comissao: { label: "Comissão", color: "#8b5cf6" }, // violeta
 } satisfies ChartConfig
 
 const marcioChartConfig = {
-  comissaoMarcio: { label: "Comissão Marcio Filho", color: "var(--chart-3)" },
+  comissaoMarcio: { label: "Comissão Marcio Filho", color: "#a78bfa" }, // violeta suave
 } satisfies ChartConfig
+
+// "R$ 200" abaixo de mil (evita vários ticks repetindo "R$0k" quando os
+// valores são pequenos, como na comissão do Marcio); "R$3k" a partir daí.
+function formatEixoY(v: number): string {
+  const abs = Math.round(Math.abs(v))
+  return abs < 1000 ? `R$ ${abs}` : `R$${Math.round(v / 1000)}k`
+}
+
+interface ChartTooltipBRLPayloadItem {
+  value?: number | string
+  color?: string
+  dataKey?: string | number
+}
+
+// Tooltip flutuante translúcido — deliberadamente mais escuro/opaco que o
+// resto do card mesmo no tema claro (padrão comum em dashboards, dá
+// contraste extra sobre a área do gráfico), mas com uma variante clara
+// pro tema claro pra não ficar ilegível lá.
+function ChartTooltipBRL({
+  active,
+  payload,
+  label,
+  config,
+}: {
+  active?: boolean
+  payload?: ChartTooltipBRLPayloadItem[]
+  label?: string
+  config: ChartConfig
+}) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-white/95 p-3 text-xs shadow-xl dark:border-zinc-800 dark:bg-zinc-900/90 dark:text-zinc-100">
+      {label && <div className="mb-1.5 font-medium">{label}</div>}
+      <div className="grid gap-1.5">
+        {payload.map((item, i) => {
+          const key = String(item.dataKey ?? "")
+          const itemLabel = config[key]?.label ?? key
+          return (
+            <div key={i} className="flex items-center gap-2">
+              <span className="size-2 shrink-0 rounded-full" style={{ background: item.color }} />
+              <span className="text-muted-foreground dark:text-zinc-400">{itemLabel}</span>
+              <span className="ml-auto pl-3 font-mono font-semibold tabular-nums">
+                {formatBRL(Number(item.value))}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
   const [casaFiltro, setCasaFiltro] = React.useState(() => (typeof casaAtualId === "number" ? String(casaAtualId) : todasValue))
@@ -304,21 +352,15 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
                 <BarChart data={chartData} margin={{ top: 24, left: -12, right: 12 }} barCategoryGap="18%" barGap={4}>
                   <CartesianGrid vertical={false} strokeDasharray="3 3" />
                   <XAxis dataKey="nome" tickLine={false} axisLine={false} tickMargin={10} fontSize={12} />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    fontSize={11}
-                    width={64}
-                    tickFormatter={(v) => `R$${Math.round(Number(v) / 1000)}k`}
-                  />
+                  <YAxis tickLine={false} axisLine={false} fontSize={11} width={64} tickFormatter={formatEixoY} />
                   <ChartTooltip
                     cursor={{ fill: "var(--muted)", opacity: 0.4 }}
-                    content={<ChartTooltipContent formatter={(v) => formatBRL(Number(v))} />}
+                    content={<ChartTooltipBRL config={chartConfig} />}
                   />
-                  <ChartLegend content={<ChartLegendContent />} />
-                  <Bar dataKey="bruto" fill="var(--color-bruto)" radius={[4, 4, 0, 0]} maxBarSize={56} />
-                  <Bar dataKey="liquido" fill="var(--color-liquido)" radius={[4, 4, 0, 0]} maxBarSize={56} />
-                  <Bar dataKey="comissao" fill="var(--color-comissao)" radius={[4, 4, 0, 0]} maxBarSize={56} />
+                  <ChartLegend content={<ChartLegendContent indicatorClassName="size-2.5 rounded-full" />} />
+                  <Bar dataKey="bruto" fill="var(--color-bruto)" radius={[6, 6, 0, 0]} maxBarSize={32} />
+                  <Bar dataKey="liquido" fill="var(--color-liquido)" radius={[6, 6, 0, 0]} maxBarSize={32} />
+                  <Bar dataKey="comissao" fill="var(--color-comissao)" radius={[6, 6, 0, 0]} maxBarSize={32} />
                 </BarChart>
               </ChartContainer>
             </CardContent>
@@ -411,14 +453,18 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
                     axisLine={false}
                     fontSize={11}
                     width={64}
-                    tickFormatter={(v) => `R$${Math.round(Number(v) / 1000)}k`}
+                    domain={[0, "dataMax + 100"]}
+                    tickFormatter={formatEixoY}
                   />
-                  <ChartTooltip content={<ChartTooltipContent formatter={(v) => formatBRL(Number(v))} />} />
+                  <ChartTooltip
+                    cursor={{ fill: "var(--muted)", opacity: 0.4 }}
+                    content={<ChartTooltipBRL config={marcioChartConfig} />}
+                  />
                   <Bar
                     dataKey="comissaoMarcio"
                     fill="var(--color-comissaoMarcio)"
                     radius={[6, 6, 0, 0]}
-                    maxBarSize={64}
+                    maxBarSize={36}
                     className="cursor-pointer"
                     onClick={(data: { payload?: { nome: string; casaId?: number; plataforma?: string } }) => {
                       const item = data.payload

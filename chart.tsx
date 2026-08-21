@@ -276,9 +276,14 @@ function ChartLegendContent({
   payload,
   verticalAlign = "bottom",
   nameKey,
+  indicatorClassName,
 }: React.ComponentProps<"div"> & {
   hideIcon?: boolean
   nameKey?: string
+  // Permite trocar o indicador padrão (quadradinho) por outro formato —
+  // ex: "size-2.5 rounded-full" pros gráficos do Setor de Ganhos — sem
+  // precisar duplicar o componente inteiro.
+  indicatorClassName?: string
 } & RechartsPrimitive.DefaultLegendContentProps) {
   const { config } = useChart()
 
@@ -304,14 +309,14 @@ function ChartLegendContent({
             <div
               key={index}
               className={cn(
-                "flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground"
+                "flex items-center gap-1.5 text-muted-foreground [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground"
               )}
             >
               {itemConfig?.icon && !hideIcon ? (
                 <itemConfig.icon />
               ) : (
                 <div
-                  className="h-2 w-2 shrink-0 rounded-[2px]"
+                  className={cn("h-2 w-2 shrink-0 rounded-[2px]", indicatorClassName)}
                   style={{
                     backgroundColor: item.color,
                   }}
