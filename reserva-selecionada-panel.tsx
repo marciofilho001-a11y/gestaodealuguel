@@ -60,7 +60,13 @@ export function ReservaSelecionadaPanel({
       </CardHeader>
       <CardContent className="flex flex-col gap-4 px-4">
         <div className="flex flex-col items-center gap-2 text-center">
-          <GuestAvatar nome={reserva.hospede || "?"} casas={casas} casaId={reserva.casa_id} size="lg" />
+          <GuestAvatar
+            nome={reserva.hospede || "?"}
+            casas={casas}
+            casaId={reserva.casa_id}
+            size="lg"
+            className="ring-2 ring-primary/25"
+          />
           <div className="font-heading text-[15px] font-bold">{reserva.hospede || "(sem nome)"}</div>
           <Badge variant="outline" className={STATUS_BADGE[status]}>
             {STATUS_LABEL[status]}
@@ -112,9 +118,9 @@ export function ReservaSelecionadaPanel({
           </Button>
           <Button
             size="sm"
-            variant="outline"
+            variant="destructive"
             disabled={jaCancelada}
-            className="w-full justify-start text-destructive hover:bg-destructive/10 hover:text-destructive"
+            className="w-full justify-start"
             onClick={handleCancelar}
           >
             <Ban data-icon="inline-start" />
