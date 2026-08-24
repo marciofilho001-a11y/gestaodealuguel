@@ -28,6 +28,12 @@ interface GanhosPageProps {
 
 const todasValue = "__todas__"
 
+// Espaçamento generoso pras tabelas do Setor de Ganhos — mesmo padrão já
+// usado no drilldown de reservas (px-4 py-3), em vez do p-2 compacto padrão
+// do componente Table genérico.
+const th = "px-4 py-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+const td = "px-4 py-3"
+
 function GanhosCard({ label, value, hero, index }: { label: string; value: string; hero?: boolean; index: number }) {
   return (
     <Card
@@ -94,7 +100,7 @@ function ChartTooltipBRL({
 }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white/95 p-3 text-xs shadow-xl dark:border-zinc-800 dark:bg-zinc-900/90 dark:text-zinc-100">
+    <div className="rounded-xl border border-zinc-200 bg-white/95 p-3 text-xs font-medium text-zinc-900 shadow-lg dark:border-zinc-800 dark:bg-zinc-900/90 dark:text-zinc-100">
       {label && <div className="mb-1.5 font-medium">{label}</div>}
       <div className="grid gap-1.5">
         {payload.map((item, i) => {
@@ -350,7 +356,7 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
             <CardContent>
               <ChartContainer config={chartConfig} className="h-[420px] w-full">
                 <BarChart data={chartData} margin={{ top: 24, left: -12, right: 12 }} barCategoryGap="18%" barGap={4}>
-                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--chart-grid)" />
                   <XAxis dataKey="nome" tickLine={false} axisLine={false} tickMargin={10} fontSize={12} />
                   <YAxis tickLine={false} axisLine={false} fontSize={11} width={64} tickFormatter={formatEixoY} />
                   <ChartTooltip
@@ -374,16 +380,16 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
                   <p className="text-[11px] text-muted-foreground/70">Clique numa linha pra ver as reservas.</p>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-hidden rounded-lg border border-border">
+                  <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Casa</TableHead>
-                          <TableHead className="text-right">Reservas</TableHead>
-                          <TableHead className="text-right">Bruto</TableHead>
-                          <TableHead className="text-right">Líquido</TableHead>
-                          <TableHead className="text-right">Comissão</TableHead>
-                          <TableHead className="text-right">Marcio</TableHead>
+                          <TableHead className={th}>Casa</TableHead>
+                          <TableHead className={cn(th, "text-right")}>Reservas</TableHead>
+                          <TableHead className={cn(th, "text-right")}>Bruto</TableHead>
+                          <TableHead className={cn(th, "text-right")}>Líquido</TableHead>
+                          <TableHead className={cn(th, "text-right")}>Comissão</TableHead>
+                          <TableHead className={cn(th, "text-right")}>Marcio</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -393,12 +399,20 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
                             className="cursor-pointer hover:bg-accent/60"
                             onClick={() => abrirDrilldownCasa(c.id, c.nome)}
                           >
-                            <TableCell className="font-medium">{c.nome}</TableCell>
-                            <TableCell className="text-right font-mono tabular-nums">{c.qtd}</TableCell>
-                            <TableCell className="text-right font-mono tabular-nums">{formatBRL(c.bruto)}</TableCell>
-                            <TableCell className="text-right font-mono tabular-nums">{formatBRL(c.liquido)}</TableCell>
-                            <TableCell className="text-right font-mono tabular-nums">{formatBRL(c.comissao)}</TableCell>
-                            <TableCell className="text-right font-mono tabular-nums">{formatBRL(c.comissaoMarcio)}</TableCell>
+                            <TableCell className={cn(td, "font-medium")}>{c.nome}</TableCell>
+                            <TableCell className={cn(td, "text-right font-mono tabular-nums")}>{c.qtd}</TableCell>
+                            <TableCell className={cn(td, "text-right font-mono font-semibold tabular-nums")}>
+                              {formatBRL(c.bruto)}
+                            </TableCell>
+                            <TableCell className={cn(td, "text-right font-mono font-semibold tabular-nums")}>
+                              {formatBRL(c.liquido)}
+                            </TableCell>
+                            <TableCell className={cn(td, "text-right font-mono tabular-nums text-muted-foreground")}>
+                              {formatBRL(c.comissao)}
+                            </TableCell>
+                            <TableCell className={cn(td, "text-right font-mono tabular-nums text-muted-foreground")}>
+                              {formatBRL(c.comissaoMarcio)}
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -419,7 +433,7 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
                     key={plat}
                     type="button"
                     onClick={() => abrirDrilldownPlataforma(plat)}
-                    className="flex w-full items-center gap-3 rounded-lg border border-border px-3 py-2.5 text-left text-xs transition-colors hover:bg-accent/60"
+                    className="flex w-full items-center gap-3 rounded-lg border border-zinc-200 px-4 py-3 text-left text-xs transition-colors hover:bg-accent/60 dark:border-zinc-800"
                   >
                     <Badge variant="outline" className={cn("gap-1.5", PLATFORM_BADGE[plat] || PLATFORM_BADGE.Outro)}>
                       <PlatformIcon plataforma={plat} size="sm" />
@@ -446,7 +460,7 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
             <CardContent>
               <ChartContainer config={marcioChartConfig} className="h-72 w-full">
                 <BarChart data={marcioChartData} margin={{ top: 24, left: -12, right: 12 }} barCategoryGap="30%">
-                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--chart-grid)" />
                   <XAxis dataKey="nome" tickLine={false} axisLine={false} tickMargin={10} fontSize={12} />
                   <YAxis
                     tickLine={false}
