@@ -9,6 +9,7 @@ import { ConfigDialog } from "@/components/config-dialog"
 import { EditarReservaDialog } from "@/components/editar-reserva-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { useTheme } from "@/components/theme-provider"
 import { ConfirmProvider } from "@/hooks/use-confirm"
 import { useAluguelData, type CasaSelecionada } from "@/hooks/use-aluguel-data"
@@ -150,9 +151,11 @@ function AppShell() {
 export function App() {
   return (
     <BrowserRouter>
-      <ConfirmProvider>
-        <AppShell />
-      </ConfirmProvider>
+      <TooltipProvider>
+        <ConfirmProvider>
+          <AppShell />
+        </ConfirmProvider>
+      </TooltipProvider>
     </BrowserRouter>
   )
 }

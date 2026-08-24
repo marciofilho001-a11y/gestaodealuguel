@@ -38,13 +38,13 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const location = useLocation()
   return (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       <SidebarHeader className="gap-0 border-b border-sidebar-border px-3 py-3.5">
-        <div className="flex items-center gap-2.5 px-1">
+        <div className="flex items-center gap-2.5 px-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary shadow-sm">
             <Home className="size-4 text-white" strokeWidth={2.3} />
           </span>
-          <div className="text-[15px] leading-tight font-semibold tracking-tight">
+          <div className="text-[15px] leading-tight font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
             <span>GESTÃO</span> <span className="text-sidebar-foreground/60">DE ALUGUEL</span>
           </div>
         </div>
@@ -59,6 +59,7 @@ export function AppSidebar({
                 <SidebarMenuButton
                   isActive={casaAtualId === "todas"}
                   onClick={() => onSelectCasa("todas")}
+                  tooltip="Todas as Casas"
                   className={cn(
                     "transition-colors duration-150",
                     casaAtualId === "todas" && "bg-primary/10 font-medium text-primary hover:bg-primary/15 hover:text-primary dark:bg-primary/15 dark:hover:bg-primary/20"
@@ -73,6 +74,7 @@ export function AppSidebar({
                   <SidebarMenuButton
                     isActive={casaAtualId === casa.id}
                     onClick={() => onSelectCasa(casa.id)}
+                    tooltip={casa.nome}
                     className={cn(
                       "transition-colors duration-150",
                       casaAtualId === casa.id && "bg-primary/10 font-medium text-primary hover:bg-primary/15 hover:text-primary dark:bg-primary/15 dark:hover:bg-primary/20"
@@ -87,7 +89,11 @@ export function AppSidebar({
                 </SidebarMenuItem>
               ))}
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={onOpenCasas} className="text-sidebar-foreground/70 transition-colors duration-150">
+                <SidebarMenuButton
+                  onClick={onOpenCasas}
+                  tooltip="Nova casa"
+                  className="text-sidebar-foreground/70 transition-colors duration-150"
+                >
                   <PlusCircle />
                   <span>Nova casa</span>
                 </SidebarMenuButton>
@@ -104,6 +110,7 @@ export function AppSidebar({
                 <SidebarMenuButton
                   asChild
                   isActive={location.pathname === "/ganhos"}
+                  tooltip="Setor de Ganhos"
                   className={cn(
                     "transition-colors duration-150",
                     location.pathname === "/ganhos" && "bg-primary/10 font-medium text-primary hover:bg-primary/15 hover:text-primary dark:bg-primary/15 dark:hover:bg-primary/20"
@@ -116,13 +123,13 @@ export function AppSidebar({
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={onOpenCasas} className="transition-colors duration-150">
+                <SidebarMenuButton onClick={onOpenCasas} tooltip="Gerenciar Casas" className="transition-colors duration-150">
                   <Building2 />
                   <span>Gerenciar Casas</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={onOpenConfig} className="transition-colors duration-150">
+                <SidebarMenuButton onClick={onOpenConfig} tooltip="Configurações" className="transition-colors duration-150">
                   <Settings />
                   <span>Configurações</span>
                 </SidebarMenuButton>
@@ -135,7 +142,11 @@ export function AppSidebar({
       <SidebarFooter className="border-t border-sidebar-border p-2">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={onOpenCommand} className="text-sidebar-foreground/60 transition-colors duration-150">
+            <SidebarMenuButton
+              onClick={onOpenCommand}
+              tooltip="Busca rápida"
+              className="text-sidebar-foreground/60 transition-colors duration-150"
+            >
               <Command />
               <span>Busca rápida</span>
               <Kbd className="ml-auto">⌘K</Kbd>

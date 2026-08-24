@@ -46,7 +46,7 @@ function ReservaDayCard({ reserva, casas, modoTodasCasas, selected, onSelect }: 
       type="button"
       onClick={onSelect}
       className={cn(
-        "flex w-full min-w-0 flex-col items-start gap-0.5 rounded-lg border p-1.5 text-left leading-tight transition-colors",
+        "flex w-full min-w-0 flex-col items-start gap-0.5 rounded-lg border p-2 text-left leading-tight transition-colors",
         selected
           ? "border-primary bg-primary/10 ring-1 ring-primary"
           : "border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100/70 dark:border-border dark:bg-card dark:text-foreground dark:hover:bg-accent/40"
@@ -143,8 +143,8 @@ export function CalendarView({
 
   return (
     <Card className="gap-3 py-4">
-      <CardContent className="px-3">
-        <div className="grid grid-cols-7 gap-1">
+      <CardContent className="px-4">
+        <div className="grid grid-cols-7 gap-2">
           {DOWS.map((d) => (
             <div key={d} className="py-1 text-center font-mono text-[10.5px] font-semibold text-muted-foreground">
               {d}
@@ -154,7 +154,7 @@ export function CalendarView({
             <div
               key={i}
               className={cn(
-                "flex min-h-48 min-w-0 flex-col gap-1 rounded-lg p-1.5 text-[11.5px]",
+                "flex min-h-56 min-w-0 flex-col gap-1.5 rounded-lg p-2 text-[11.5px]",
                 dia.outMonth ? "text-muted-foreground/40" : "text-foreground",
                 dia.isToday && "bg-accent/40 ring-1 ring-primary/40"
               )}

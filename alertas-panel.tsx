@@ -1,7 +1,6 @@
 import * as React from "react"
 import { BellRing, CalendarClock, CalendarHeart, DoorOpen, KeyRound } from "lucide-react"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { formatDate } from "@/lib/format"
 import type { Casa, Reserva } from "@/types"
@@ -45,6 +44,9 @@ const MAX_FUTURAS = 5
 // Até quantos dias à frente essas legendas olham
 const JANELA_FUTURAS_DIAS = 90
 
+// Sem Card próprio — este painel vive dentro do Sheet lateral aberto pelo
+// dashboard (o Sheet já é o "cartão"; aninhar outro por dentro duplicaria a
+// moldura). SheetHeader/SheetTitle ficam a cargo de quem monta o Sheet.
 export function AlertasPanel({ reservasCasa, modoTodasCasas, casas, onEditReserva }: AlertasPanelProps) {
   const alertas = React.useMemo(() => {
     const hoje = new Date()
@@ -104,44 +106,36 @@ export function AlertasPanel({ reservasCasa, modoTodasCasas, casas, onEditReserv
   }, [reservasCasa, modoTodasCasas, casas])
 
   return (
-    <Card className="gap-3 py-4">
-      <CardHeader className="px-4">
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <BellRing className="size-4 text-primary" />
-          Alertas
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-2 px-4">
-        {alertas.length === 0 ? (
-          <Empty className="py-6">
-            <EmptyMedia variant="icon">
-              <BellRing />
-            </EmptyMedia>
-            <EmptyTitle className="text-sm">Tudo tranquilo</EmptyTitle>
-            <EmptyDescription>Nenhum check-in ou check-out nos próximos dias.</EmptyDescription>
-          </Empty>
-        ) : (
-          alertas.map((a, i) => {
-            const Icone = ICONES[a.tipo]
-            return (
-              <button
-                key={i}
-                type="button"
-                onClick={() => onEditReserva(a.reservaId)}
-                className="flex items-start gap-2.5 rounded-lg border border-border/70 p-2.5 text-left transition-colors hover:bg-accent/40"
-              >
-                <span className={`flex size-7 shrink-0 items-center justify-center rounded-md ${CORES[a.tipo]}`}>
-                  <Icone className="size-3.5" />
-                </span>
-                <div className="min-w-0 leading-tight">
-                  <div className="truncate text-[13px] font-semibold">{a.titulo}</div>
-                  <div className="truncate text-[11.5px] text-muted-foreground">{a.sub}</div>
-                </div>
-              </button>
-            )
-          })
-        )}
-      </CardContent>
-    </Card>
+    <div className="flex flex-col gap-2">
+      {alertas.length === 0 ? (
+        <Empty className="py-6">
+          <EmptyMedia variant="icon">
+            <BellRing />
+          </EmptyMedia>
+          <EmptyTitle className="text-sm">Tudo tranquilo</EmptyTitle>
+          <EmptyDescription>Nenhum check-in ou check-out nos próximos dias.</EmptyDescription>
+        </Empty>
+      ) : (
+        alertas.map((a, i) => {
+          const Icone = ICONES[a.tipo]
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onEditReserva(a.reservaId)}
+              className="flex items-start gap-2.5 rounded-lg border border-border p-2.5 text-left transition-colors hover:bg-accent/40"
+            >
+              <span className={`flex size-7 shrink-0 items-center justify-center rounded-md ${CORES[a.tipo]}`}>
+                <Icone className="size-3.5" />
+              </span>
+              <div className="min-w-0 leading-tight">
+                <div className="truncate text-[13px] font-semibold">{a.titulo}</div>
+                <div className="truncate text-[11.5px] text-muted-foreground">{a.sub}</div>
+              </div>
+            </button>
+          )
+        })
+      )}
+    </div>
   )
 }
