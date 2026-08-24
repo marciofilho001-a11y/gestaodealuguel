@@ -4,13 +4,16 @@
 export const PLATFORM_BAR: Record<string, string> = {
   Airbnb: "bg-airbnb",
   Booking: "bg-booking",
-  Outro: "bg-muted-foreground",
+  Outro: "bg-emerald-500",
 }
 
 export const PLATFORM_BADGE: Record<string, string> = {
   Airbnb: "bg-airbnb-soft text-airbnb border-transparent",
   Booking: "bg-booking-soft text-booking border-transparent",
-  Outro: "bg-secondary text-secondary-foreground border-transparent",
+  // "Outro" cobre reservas fechadas direto com o hóspede (sem Airbnb/Booking
+  // no meio) — verde esmeralda #10B981 pra diferenciar das duas plataformas
+  // (antes era cinza neutro, mesma cor de "sem plataforma nenhuma").
+  Outro: "bg-emerald-50 text-emerald-700 border-transparent dark:bg-emerald-950/40 dark:text-emerald-400",
 }
 
 export const STATUS_LABEL: Record<string, string> = {
@@ -31,5 +34,5 @@ export const STATUS_BADGE: Record<string, string> = {
 export const PLATFORM_COLOR: Record<string, string> = {
   Airbnb: "#FF385C",
   Booking: "#003580",
-  Outro: "#64748B",
+  Outro: "#10B981",
 }

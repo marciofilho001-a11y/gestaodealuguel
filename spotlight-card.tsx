@@ -32,7 +32,12 @@ export function SpotlightCard({ className, children, ...props }: React.Component
         // quem já usava `group-data-[...]/card:` esperando o <Card> padrão
         // como ancestral (ex: GanhosCard, pro estado `hero`) continua
         // funcionando ao trocar <Card> por <SpotlightCard>.
-        "group/card group/spotlight relative isolate flex flex-col gap-(--card-spacing) overflow-hidden rounded-2xl border border-border bg-card py-(--card-spacing) text-sm text-card-foreground shadow-sm [--card-spacing:--spacing(4)]",
+        // Borda "reativa": nasce quase invisível (semi-transparente nos dois
+        // temas, via --border já em baixa opacidade) e acende pra opacidade
+        // cheia no hover — junto com o brilho radial, dá a leitura de que o
+        // cartão inteiro "acorda" sob o cursor, sem competir de cor com o
+        // gradiente violeta/esmeralda do spotlight em si.
+        "group/card group/spotlight relative isolate flex flex-col gap-(--card-spacing) overflow-hidden rounded-2xl border border-border/60 bg-card py-(--card-spacing) text-sm text-card-foreground shadow-sm transition-colors duration-300 [--card-spacing:--spacing(4)] hover:border-border",
         className
       )}
       {...props}
