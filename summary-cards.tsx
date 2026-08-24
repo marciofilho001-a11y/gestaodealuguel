@@ -1,7 +1,7 @@
 import * as React from "react"
 import { Area, AreaChart } from "recharts"
 
-import { Card } from "@/components/ui/card"
+import { SpotlightCard } from "@/components/spotlight-card"
 import { formatBRL } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { Reserva } from "@/types"
@@ -51,11 +51,8 @@ function SummaryCard({
   index?: number
 }) {
   return (
-    <Card
+    <SpotlightCard
       className={cn(
-        // Sem `border`/`rounded-xl`/`overflow-hidden` explícitos — o Card já
-        // declara essa elevação sozinho (ring sutil + sombra em duas
-        // camadas); duplicar com uma borda literal por cima vira "ghost card".
         "animate-stagger-in min-w-0 gap-1 p-4",
         hero ? "border-foreground bg-foreground text-background" : "bg-card"
       )}
@@ -74,7 +71,7 @@ function SummaryCard({
       </div>
       <div className={cn("truncate text-[11px]", hero ? "text-background/55" : "text-muted-foreground/80")}>{sub}</div>
       {sparkline && <MesSparkline pontos={sparkline} />}
-    </Card>
+    </SpotlightCard>
   )
 }
 

@@ -1,4 +1,5 @@
 import * as React from "react"
+import { motion } from "framer-motion"
 import { DoorOpen } from "lucide-react"
 
 import { Card, CardContent } from "@/components/ui/card"
@@ -42,11 +43,13 @@ function ReservaDayCard({ reserva, casas, modoTodasCasas, selected, onSelect }: 
   const nomeAbreviado = abreviarNome(reserva.hospede) || "(sem nome)"
 
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onSelect}
+      whileHover={{ y: -2 }}
+      transition={{ duration: 0.15 }}
       className={cn(
-        "flex w-full min-w-0 flex-col items-start gap-0.5 rounded-lg border p-2 text-left leading-tight transition-colors",
+        "flex w-full min-w-0 flex-col items-start gap-0.5 rounded-lg border p-2 text-left leading-tight shadow-none transition-[background-color,border-color,box-shadow] hover:shadow-sm",
         selected
           ? "border-primary bg-primary/10 ring-1 ring-primary"
           : "border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100/70 dark:border-border dark:bg-card dark:text-foreground dark:hover:bg-accent/40"
@@ -69,7 +72,7 @@ function ReservaDayCard({ reserva, casas, modoTodasCasas, selected, onSelect }: 
       <span className="w-full min-w-0 truncate font-mono text-[11px] leading-tight font-bold tabular-nums text-emerald-800 dark:text-emerald-400">
         {formatBRLCompacto(reserva.valor_total)}
       </span>
-    </button>
+    </motion.button>
   )
 }
 
@@ -83,11 +86,13 @@ interface CheckoutBadgeProps {
 // card de check-in, só pra sinalizar "casa libera hoje" de relance.
 function CheckoutBadge({ reserva, selected, onSelect }: CheckoutBadgeProps) {
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onSelect}
+      whileHover={{ y: -2 }}
+      transition={{ duration: 0.15 }}
       className={cn(
-        "flex w-full min-w-0 items-center gap-1 rounded-md border p-1.5 text-left leading-tight transition-colors",
+        "flex w-full min-w-0 items-center gap-1 rounded-md border p-1.5 text-left leading-tight transition-[background-color,border-color,box-shadow] hover:shadow-sm",
         selected
           ? "border-rose-400 bg-rose-100 text-rose-900 ring-1 ring-rose-400 dark:border-destructive dark:bg-destructive/15 dark:text-destructive dark:ring-destructive"
           : "border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100/70 dark:border-destructive/25 dark:bg-destructive/5 dark:text-destructive/80 dark:hover:bg-destructive/10"
@@ -97,7 +102,7 @@ function CheckoutBadge({ reserva, selected, onSelect }: CheckoutBadgeProps) {
       <span className="min-w-0 flex-1 truncate text-[11px] leading-tight font-medium">
         Saída: {abreviarNome(reserva.hospede) || "(sem nome)"}
       </span>
-    </button>
+    </motion.button>
   )
 }
 

@@ -1,3 +1,4 @@
+import { motion } from "framer-motion"
 import { Building2, Command, Grid2x2, Home, PlusCircle, Settings, Wallet } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 
@@ -18,6 +19,21 @@ import { corDaCasa } from "@/lib/colors"
 import { cn } from "@/lib/utils"
 import type { Casa } from "@/types"
 import type { CasaSelecionada } from "@/hooks/use-aluguel-data"
+
+// Pílula que desliza entre o item ativo do seletor de casas — só um
+// <motion.div> com este layoutId existe no DOM por vez (condicionado por
+// `isActive` em cada botão), então o framer-motion anima sozinho a
+// transição de posição quando a casa selecionada muda. `-z-10` faz a
+// pílula pintar atrás do ícone/texto sem precisar envolvê-los em wrapper.
+function SidebarActivePill() {
+  return (
+    <motion.div
+      layoutId="sidebar-casa-tab"
+      className="absolute inset-0 -z-10 rounded-md bg-primary/10 dark:bg-primary/15"
+      transition={{ type: "spring", stiffness: 500, damping: 35 }}
+    />
+  )
+}
 
 interface AppSidebarProps {
   casas: Casa[]
@@ -61,10 +77,11 @@ export function AppSidebar({
                   onClick={() => onSelectCasa("todas")}
                   tooltip="Todas as Casas"
                   className={cn(
-                    "transition-colors duration-150",
-                    casaAtualId === "todas" && "bg-primary/10 font-medium text-primary hover:bg-primary/15 hover:text-primary dark:bg-primary/15 dark:hover:bg-primary/20"
+                    "relative isolate transition-colors duration-150",
+                    casaAtualId === "todas" && "font-medium text-primary hover:text-primary"
                   )}
                 >
+                  {casaAtualId === "todas" && <SidebarActivePill />}
                   <Grid2x2 />
                   <span>Todas as Casas</span>
                 </SidebarMenuButton>
@@ -76,10 +93,11 @@ export function AppSidebar({
                     onClick={() => onSelectCasa(casa.id)}
                     tooltip={casa.nome}
                     className={cn(
-                      "transition-colors duration-150",
-                      casaAtualId === casa.id && "bg-primary/10 font-medium text-primary hover:bg-primary/15 hover:text-primary dark:bg-primary/15 dark:hover:bg-primary/20"
+                      "relative isolate transition-colors duration-150",
+                      casaAtualId === casa.id && "font-medium text-primary hover:text-primary"
                     )}
                   >
+                    {casaAtualId === casa.id && <SidebarActivePill />}
                     <span
                       className="size-2.5 shrink-0 rounded-full"
                       style={{ background: corDaCasa(casas, casa.id) }}

@@ -1,4 +1,5 @@
 import * as React from "react"
+import { motion } from "framer-motion"
 import { Cell, Pie, PieChart } from "recharts"
 import { ArrowLeft, UserRound, Wallet } from "lucide-react"
 import { Link } from "react-router-dom"
@@ -13,11 +14,13 @@ import { Field, FieldLabel } from "@/components/ui/field"
 import { PlatformIcon } from "@/components/platform-icon"
 import { ReservasDrilldownDialog } from "@/components/reservas-drilldown-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { SpotlightCard, SpotlightOverlay } from "@/components/spotlight-card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatBRL, primeiroDiaMes, ultimoDiaMes } from "@/lib/format"
 import { PLATFORM_BADGE, PLATFORM_COLOR } from "@/lib/platform"
 import { cn } from "@/lib/utils"
 import type { CasaSelecionada } from "@/hooks/use-aluguel-data"
+import { useSpotlight } from "@/hooks/use-spotlight"
 import type { Casa, Reserva } from "@/types"
 
 interface GanhosPageProps {
@@ -36,10 +39,7 @@ const td = "px-4 py-3"
 
 function GanhosCard({ label, value, hero, index }: { label: string; value: string; hero?: boolean; index: number }) {
   return (
-    <Card
-      // Sem `border`/`rounded-xl`/`overflow-hidden` explícitos — o Card já
-      // declara essa elevação sozinho (ring sutil + sombra em duas camadas);
-      // duplicar com uma borda literal por cima vira "ghost card".
+    <SpotlightCard
       className="animate-stagger-in min-w-0 gap-1 p-4 data-[hero=true]:border-foreground data-[hero=true]:bg-foreground data-[hero=true]:text-background"
       data-hero={hero}
       style={{ animationDelay: `${index * 55}ms` }}
@@ -57,7 +57,7 @@ function GanhosCard({ label, value, hero, index }: { label: string; value: strin
       >
         {value}
       </div>
-    </Card>
+    </SpotlightCard>
   )
 }
 
@@ -100,6 +100,33 @@ function DonutTooltip({ active, payload }: { active?: boolean; payload?: DonutTo
 // tema) — não há série alguma pra declarar aqui.
 const donutChartConfig = {} satisfies ChartConfig
 
+// Card de plataforma com spotlight — é um <button> (precisa ser clicável
+// pro drilldown), então não dá pra usar <SpotlightCard> (que é um <div>);
+// reaproveita o mesmo hook `useSpotlight` por trás.
+function PlataformaCard({
+  children,
+  delay,
+  onClick,
+}: {
+  children: React.ReactNode
+  delay: number
+  onClick: () => void
+}) {
+  const { handleMouseMove, background } = useSpotlight()
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseMove={handleMouseMove}
+      className="group/spotlight animate-stagger-in relative isolate flex flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-5 text-left shadow-sm transition-colors hover:bg-accent/40"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <SpotlightOverlay background={background} />
+      {children}
+    </button>
+  )
+}
+
 export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
   const [casaFiltro, setCasaFiltro] = React.useState(() => (typeof casaAtualId === "number" ? String(casaAtualId) : todasValue))
   const [de, setDe] = React.useState(() => primeiroDiaMes(new Date()))
@@ -116,6 +143,17 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
     setDe(new Date(hoje.getFullYear(), 0, 1).toISOString().slice(0, 10))
     setAte(new Date(hoje.getFullYear(), 11, 31).toISOString().slice(0, 10))
   }
+
+  // "Aba ativa" derivada do período atual (não de qual botão foi clicado
+  // por último) — se o usuário editar as datas manualmente até baterem com
+  // um dos atalhos, a aba correspondente acende sozinha; se ele desviar, as
+  // duas apagam. Espelha exatamente o cálculo de cada atalho pra comparar
+  // igual com igual.
+  const hojeRef = new Date()
+  const isMesAtual = de === primeiroDiaMes(hojeRef) && ate === ultimoDiaMes(hojeRef)
+  const isAnoAtual =
+    de === new Date(hojeRef.getFullYear(), 0, 1).toISOString().slice(0, 10) &&
+    ate === new Date(hojeRef.getFullYear(), 11, 31).toISOString().slice(0, 10)
 
   const resultado = React.useMemo(() => {
     let filtradas = reservas.filter((r) => r.status !== "cancelada")
@@ -280,12 +318,42 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
               className="border-input bg-background flex h-8 w-full rounded-md border px-2.5 font-mono text-xs shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             />
           </Field>
-          <Button variant="outline" size="sm" onClick={atalhoMesAtual}>
-            Mês Atual
-          </Button>
-          <Button variant="outline" size="sm" onClick={atalhoAnoAtual}>
-            Ano Atual
-          </Button>
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-1">
+            <button
+              type="button"
+              onClick={atalhoMesAtual}
+              className={cn(
+                "relative isolate h-6 rounded-md px-2.5 text-xs font-medium transition-colors",
+                isMesAtual ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {isMesAtual && (
+                <motion.div
+                  layoutId="ganhos-periodo-pill"
+                  className="absolute inset-0 -z-10 rounded-md bg-primary"
+                  transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                />
+              )}
+              Mês Atual
+            </button>
+            <button
+              type="button"
+              onClick={atalhoAnoAtual}
+              className={cn(
+                "relative isolate h-6 rounded-md px-2.5 text-xs font-medium transition-colors",
+                isAnoAtual ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {isAnoAtual && (
+                <motion.div
+                  layoutId="ganhos-periodo-pill"
+                  className="absolute inset-0 -z-10 rounded-md bg-primary"
+                  transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                />
+              )}
+              Ano Atual
+            </button>
+          </div>
         </CardContent>
       </Card>
 
@@ -376,12 +444,10 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
                 const pctTaxas = v.bruto > 0 ? (v.comissao / v.bruto) * 100 : 0
                 const pctMarcio = v.bruto > 0 ? (v.comissaoMarcio / v.bruto) * 100 : 0
                 return (
-                  <button
+                  <PlataformaCard
                     key={plat}
-                    type="button"
+                    delay={i * 55}
                     onClick={() => abrirDrilldownPlataforma(plat)}
-                    className="animate-stagger-in flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 text-left shadow-sm transition-colors hover:bg-accent/40"
-                    style={{ animationDelay: `${i * 55}ms` }}
                   >
                     <div className="flex items-center gap-3">
                       <Badge variant="outline" className={cn("gap-1.5", PLATFORM_BADGE[plat] || PLATFORM_BADGE.Outro)}>
@@ -416,7 +482,7 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
                         Marcio <b className="tabular-nums text-foreground">{formatBRL(v.comissaoMarcio)}</b>
                       </span>
                     </div>
-                  </button>
+                  </PlataformaCard>
                 )
               })}
             </div>

@@ -2,7 +2,7 @@ import * as React from "react"
 import { PlusCircle } from "lucide-react"
 
 import { ReservaForm } from "@/components/reserva-form"
-import { Button } from "@/components/ui/button"
+import { ShinyButton } from "@/components/shiny-button"
 import {
   Dialog,
   DialogContent,
@@ -36,9 +36,9 @@ export function NovaReservaDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
+        <ShinyButton>
           <PlusCircle data-icon="inline-start" /> Adicionar Reserva
-        </Button>
+        </ShinyButton>
       </DialogTrigger>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
