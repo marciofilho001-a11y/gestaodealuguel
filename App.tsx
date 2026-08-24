@@ -41,24 +41,14 @@ function AppShell() {
   const [configOpen, setConfigOpen] = React.useState(false)
   const [editId, setEditId] = React.useState<number | null>(null)
   const [commandOpen, setCommandOpen] = React.useState(false)
-  const [mesAtual, setMesAtual] = React.useState(() => {
-    const d = new Date()
-    d.setDate(1)
-    return d
-  })
-
-  function mudarMes(delta: number) {
-    setMesAtual((atual) => {
-      const novo = new Date(atual)
-      novo.setMonth(novo.getMonth() + delta)
-      return novo
-    })
-  }
+  // O calendário virou um feed contínuo (rola por vários meses, sem
+  // paginação) — não existe mais "o mês atual" como estado global. Isso só
+  // avisa o dashboard pra rolar o feed de volta pro mês de hoje, venha o
+  // clique de onde vier (cabeçalho local ou Command Menu).
+  const [hojeSignal, setHojeSignal] = React.useState(0)
 
   function irParaHoje() {
-    const hoje = new Date()
-    hoje.setDate(1)
-    setMesAtual(hoje)
+    setHojeSignal((s) => s + 1)
     navigate("/")
   }
 
@@ -101,8 +91,7 @@ function AppShell() {
                 data={data}
                 onOpenCasas={() => setCasasOpen(true)}
                 onEditReserva={setEditId}
-                mesAtual={mesAtual}
-                onMudarMes={mudarMes}
+                hojeSignal={hojeSignal}
                 onHoje={irParaHoje}
               />
             }

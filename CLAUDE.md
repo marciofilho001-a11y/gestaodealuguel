@@ -48,6 +48,22 @@ guarda a % da Comissão Marcio Filho, linha única com id=1).
   como legenda narrativa ("Em dezembro, Casa X: reserva de Fulano..."), além
   dos alertas de check-in/checkout próximos. Todo item do painel é clicável e
   abre a edição da reserva.
+- **Calendário virou feed vertical contínuo** (`calendar-view.tsx`, estilo
+  Airbnb Host Calendar) — não pagina mais um mês por vez. Os meses nascem
+  carregados (2 antes, 5 depois do atual) e a rolagem infinita
+  (`IntersectionObserver` nas sentinelas do topo/fim) carrega mais conforme
+  o usuário rola, até um limite de segurança (±24/36 meses). O componente
+  expõe `scrollToMonth` via `ref` (`CalendarViewHandle`) — é assim que os
+  botões «◀ ▶ Hoje» do cabeçalho e o Command Menu pulam pra um mês sem
+  recriar o feed. O "mês em foco" (rótulo do cabeçalho + cards de resumo)
+  vem de um scrollspy interno (`onMesFocoChange`), não de um estado
+  controlado pelo pai — ver `dashboard-page.tsx`.
+- **Tabela de reservas saiu da página** e foi para dentro de um Bottom Sheet
+  (`Sheet side="bottom"`), aberto por uma pílula flutuante fixa no rodapé
+  ("Ver todas as reservas..."). `reservas-section.tsx` (filtros + tabela)
+  não mudou por dentro, só mudou de casa. Existe também um botão flutuante
+  redondo (seta ↑) que só aparece quando o mês em foco não é o atual — pula
+  de volta pro mês de hoje.
 
 ## Estrutura
 

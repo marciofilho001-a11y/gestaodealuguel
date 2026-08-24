@@ -2,7 +2,6 @@ import * as React from "react"
 import { motion } from "framer-motion"
 import { DoorOpen } from "lucide-react"
 
-import { Card, CardContent } from "@/components/ui/card"
 import { GuestAvatar } from "@/components/guest-avatar"
 import { corDaCasa } from "@/lib/colors"
 import { abreviarNome, formatBRLCompacto, formatDiaMes } from "@/lib/format"
@@ -16,13 +15,28 @@ const MAX_CARDS_POR_DIA = 2
 // Quantos avisos de saída (check-out) mostrar antes de resumir em "+N"
 const MAX_SAIDAS_POR_DIA = 3
 
-interface CalendarViewProps {
-  casas: Casa[]
-  reservasCasa: Reserva[]
-  modoTodasCasas: boolean
-  mesAtual: Date
-  selectedReservaId: number | null
-  onSelectReserva: (id: number) => void
+// Quantos meses o feed já nasce carregado (antes/depois do mês atual) e até
+// onde a rolagem infinita pode esticar o range — evita crescer pra sempre
+// se alguém ficar rolando com o dedo preso.
+const MESES_INICIAIS_PASSADO = 2
+const MESES_INICIAIS_FUTURO = 5
+const LIMITE_PASSADO = 24
+const LIMITE_FUTURO = 36
+
+function startOfMonth(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), 1)
+}
+
+function addMonths(d: Date, n: number): Date {
+  return new Date(d.getFullYear(), d.getMonth() + n, 1)
+}
+
+function monthKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+}
+
+function isSameMonth(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()
 }
 
 interface ReservaDayCardProps {
@@ -106,125 +120,319 @@ function CheckoutBadge({ reserva, selected, onSelect }: CheckoutBadgeProps) {
   )
 }
 
-export function CalendarView({
+interface MonthSectionProps {
+  mes: Date
+  sectionRef: (el: HTMLElement | null) => void
+  casas: Casa[]
+  reservasCasa: Reserva[]
+  modoTodasCasas: boolean
+  selectedReservaId: number | null
+  onSelectReserva: (id: number) => void
+}
+
+function MonthSection({
+  mes,
+  sectionRef,
   casas,
   reservasCasa,
   modoTodasCasas,
-  mesAtual,
   selectedReservaId,
   onSelectReserva,
-}: CalendarViewProps) {
-  const dias = React.useMemo(() => {
-    const ano = mesAtual.getFullYear()
-    const mes = mesAtual.getMonth()
-    const primeiroDia = new Date(ano, mes, 1)
-    const inicioGrid = new Date(primeiroDia)
-    inicioGrid.setDate(primeiroDia.getDate() - primeiroDia.getDay())
-    const hoje = new Date()
-    hoje.setHours(0, 0, 0, 0)
+}: MonthSectionProps) {
+  const key = monthKey(mes)
+
+  const hoje = React.useMemo(() => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    return d
+  }, [])
+  const ehMesAtual = isSameMonth(mes, hoje)
+
+  const { dias, primeiroDiaSemana } = React.useMemo(() => {
+    const ano = mes.getFullYear()
+    const mesIdx = mes.getMonth()
+    const primeiro = new Date(ano, mesIdx, 1).getDay()
+    const totalDias = new Date(ano, mesIdx + 1, 0).getDate()
     const ativas = reservasCasa.filter((r) => r.status !== "cancelada")
 
-    return Array.from({ length: 42 }, (_, i) => {
-      const d = new Date(inicioGrid)
-      d.setDate(inicioGrid.getDate() + i)
-      // Cada reserva aparece uma única vez, no dia do check-in — evita
-      // repetir o mesmo cartão em todos os dias da estadia.
-      // Importante: "YYYY-MM-DD" sozinho o JS interpreta como UTC, mas `d`
-      // é meia-noite no fuso local — em UTC-3 isso nunca batia e os
-      // cartões nunca apareciam. Adicionando o horário força o parse local.
+    const lista = Array.from({ length: totalDias }, (_, i) => {
+      const d = new Date(ano, mesIdx, i + 1)
       const checkins = ativas.filter((r) => new Date(r.checkin + "T00:00:00").getTime() === d.getTime())
-      // Mesma lógica do check-in, mas pro dia de saída — permite sinalizar
-      // "casa libera hoje" mesmo quando não é o dia de chegada de ninguém.
       const checkouts = ativas.filter((r) => new Date(r.checkout + "T00:00:00").getTime() === d.getTime())
-      return {
-        data: d,
-        outMonth: d.getMonth() !== mes,
-        isToday: d.getTime() === hoje.getTime(),
-        checkins,
-        checkouts,
-      }
+      return { data: d, isToday: d.getTime() === hoje.getTime(), checkins, checkouts }
     })
-  }, [mesAtual, reservasCasa])
+
+    return { dias: lista, primeiroDiaSemana: primeiro }
+  }, [mes, reservasCasa, hoje])
+
+  const nomeMes = mes.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+  const totalCelulas = primeiroDiaSemana + dias.length
+  const trailing = (7 - (totalCelulas % 7)) % 7
 
   return (
-    <Card className="gap-3 py-4">
-      <CardContent className="px-4">
-        <div className="grid grid-cols-7 gap-2">
-          {DOWS.map((d) => (
-            <div key={d} className="py-1 text-center font-mono text-[10.5px] font-semibold text-muted-foreground">
-              {d}
-            </div>
-          ))}
-          {dias.map((dia, i) => (
-            <div
-              key={i}
-              className={cn(
-                "flex min-h-56 min-w-0 flex-col gap-1.5 rounded-lg p-2 text-[11.5px]",
-                dia.outMonth ? "text-muted-foreground/40" : "text-foreground",
-                dia.isToday && "bg-accent/40 ring-1 ring-primary/40"
-              )}
-            >
-              <span className="px-0.5 font-semibold">{dia.data.getDate()}</span>
-              {dia.checkins.length > 0 && (
-                <div className="flex flex-col gap-1">
-                  {dia.checkins.slice(0, MAX_CARDS_POR_DIA).map((r) => (
-                    <ReservaDayCard
-                      key={r.id}
-                      reserva={r}
-                      casas={casas}
-                      modoTodasCasas={modoTodasCasas}
-                      selected={r.id === selectedReservaId}
-                      onSelect={() => onSelectReserva(r.id)}
-                    />
-                  ))}
-                  {dia.checkins.length > MAX_CARDS_POR_DIA && (
-                    <span className="px-1 text-[10px] text-muted-foreground">
-                      +{dia.checkins.length - MAX_CARDS_POR_DIA} mais
-                    </span>
-                  )}
-                </div>
-              )}
-              {dia.checkouts.length > 0 && (
-                <div className="flex flex-col gap-1">
-                  {dia.checkouts.slice(0, MAX_SAIDAS_POR_DIA).map((r) => (
-                    <CheckoutBadge
-                      key={`checkout-${r.id}`}
-                      reserva={r}
-                      selected={r.id === selectedReservaId}
-                      onSelect={() => onSelectReserva(r.id)}
-                    />
-                  ))}
-                  {dia.checkouts.length > MAX_SAIDAS_POR_DIA && (
-                    <span className="px-1 text-[10px] text-muted-foreground">
-                      +{dia.checkouts.length - MAX_SAIDAS_POR_DIA} saídas
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-border pt-3 text-[11px] text-muted-foreground">
-          {modoTodasCasas
-            ? casas.map((c) => (
-                <span key={c.id} className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-full" style={{ background: corDaCasa(casas, c.id) }} />
-                  {c.nome}
-                </span>
-              ))
-            : (["Airbnb", "Booking", "Outro"] as const).map((p) => (
-                <span key={p} className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-full" style={{ background: PLATFORM_COLOR[p] }} />
-                  {p}
-                </span>
-              ))}
-          <span className="flex items-center gap-1.5 text-rose-700 dark:text-destructive/80">
-            <DoorOpen className="size-3" />
-            Saída (check-out)
+    <section ref={sectionRef} data-month-key={key} className="scroll-mt-16">
+      <div className="mb-3 flex items-baseline gap-2.5 px-0.5">
+        <h2 className="text-2xl font-bold capitalize text-foreground">{nomeMes}</h2>
+        {ehMesAtual && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+            <span className="size-1.5 rounded-full bg-primary" />
+            mês atual
           </span>
-        </div>
-      </CardContent>
-    </Card>
+        )}
+      </div>
+      <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+        {DOWS.map((d) => (
+          <div key={d} className="py-1 text-center font-mono text-[10.5px] font-semibold text-muted-foreground">
+            {d}
+          </div>
+        ))}
+        {Array.from({ length: primeiroDiaSemana }, (_, i) => (
+          <div key={`lead-${i}`} aria-hidden="true" />
+        ))}
+        {dias.map((dia) => (
+          <div
+            key={dia.data.toISOString()}
+            className={cn(
+              "flex min-h-32 min-w-0 flex-col gap-1.5 rounded-2xl border border-border bg-card/60 p-2 text-[11.5px] sm:min-h-40",
+              dia.isToday && "border-primary/50 bg-primary/5 ring-1 ring-primary/30"
+            )}
+          >
+            <span className={cn("px-0.5 font-semibold", dia.isToday ? "text-primary" : "text-foreground")}>
+              {dia.data.getDate()}
+            </span>
+            {dia.checkins.length > 0 && (
+              <div className="flex flex-col gap-1">
+                {dia.checkins.slice(0, MAX_CARDS_POR_DIA).map((r) => (
+                  <ReservaDayCard
+                    key={r.id}
+                    reserva={r}
+                    casas={casas}
+                    modoTodasCasas={modoTodasCasas}
+                    selected={r.id === selectedReservaId}
+                    onSelect={() => onSelectReserva(r.id)}
+                  />
+                ))}
+                {dia.checkins.length > MAX_CARDS_POR_DIA && (
+                  <span className="px-1 text-[10px] text-muted-foreground">
+                    +{dia.checkins.length - MAX_CARDS_POR_DIA} mais
+                  </span>
+                )}
+              </div>
+            )}
+            {dia.checkouts.length > 0 && (
+              <div className="flex flex-col gap-1">
+                {dia.checkouts.slice(0, MAX_SAIDAS_POR_DIA).map((r) => (
+                  <CheckoutBadge
+                    key={`checkout-${r.id}`}
+                    reserva={r}
+                    selected={r.id === selectedReservaId}
+                    onSelect={() => onSelectReserva(r.id)}
+                  />
+                ))}
+                {dia.checkouts.length > MAX_SAIDAS_POR_DIA && (
+                  <span className="px-1 text-[10px] text-muted-foreground">
+                    +{dia.checkouts.length - MAX_SAIDAS_POR_DIA} saídas
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+        {Array.from({ length: trailing }, (_, i) => (
+          <div key={`trail-${i}`} aria-hidden="true" />
+        ))}
+      </div>
+    </section>
   )
 }
+
+export interface CalendarViewHandle {
+  /** Rola o feed até o mês pedido, esticando o range carregado se preciso.
+   *  `instant` pula a animação (usado no primeiro load, pra não abrir a
+   *  página já "rolando" na frente do usuário). */
+  scrollToMonth: (date: Date, opts?: { instant?: boolean }) => void
+}
+
+interface CalendarViewProps {
+  casas: Casa[]
+  reservasCasa: Reserva[]
+  modoTodasCasas: boolean
+  selectedReservaId: number | null
+  onSelectReserva: (id: number) => void
+  /** Dispara sempre que o mês "em foco" (o que está no topo da viewport)
+   *  muda durante a rolagem — o dashboard usa isso pro rótulo do cabeçalho,
+   *  os cards de resumo e o botão de "voltar pro mês atual". */
+  onMesFocoChange?: (mes: Date) => void
+}
+
+export const CalendarView = React.forwardRef<CalendarViewHandle, CalendarViewProps>(function CalendarView(
+  { casas, reservasCasa, modoTodasCasas, selectedReservaId, onSelectReserva, onMesFocoChange },
+  ref
+) {
+  const hoje0 = React.useMemo(() => startOfMonth(new Date()), [])
+  const [meses, setMeses] = React.useState<Date[]>(() => {
+    const arr: Date[] = []
+    for (let i = -MESES_INICIAIS_PASSADO; i <= MESES_INICIAIS_FUTURO; i++) arr.push(addMonths(hoje0, i))
+    return arr
+  })
+
+  const sectionRefs = React.useRef(new Map<string, HTMLElement>())
+  const topSentinelRef = React.useRef<HTMLDivElement>(null)
+  const bottomSentinelRef = React.useRef<HTMLDivElement>(null)
+  // Guarda a altura do documento no instante em que um mês é inserido *antes*
+  // do topo, pra corrigir o scroll logo em seguida — sem isso, prepend faz a
+  // página "pular" porque o conteúdo cresce acima do que o usuário está vendo.
+  const prependAdjustRef = React.useRef<number | null>(null)
+  const onMesFocoChangeRef = React.useRef(onMesFocoChange)
+  React.useEffect(() => {
+    onMesFocoChangeRef.current = onMesFocoChange
+  })
+
+  function setSectionRef(key: string) {
+    return (el: HTMLElement | null) => {
+      if (el) sectionRefs.current.set(key, el)
+      else sectionRefs.current.delete(key)
+    }
+  }
+
+  // Scrollspy: observa uma faixa fina logo abaixo do cabeçalho fixo — o mês
+  // cuja seção estiver cruzando essa faixa é "o mês em foco" no momento.
+  React.useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue
+          const key = (entry.target as HTMLElement).dataset.monthKey
+          if (!key) continue
+          const [y, m] = key.split("-").map(Number)
+          onMesFocoChangeRef.current?.(new Date(y, m - 1, 1))
+        }
+      },
+      { rootMargin: "-72px 0px -80% 0px", threshold: 0 }
+    )
+    sectionRefs.current.forEach((el) => observer.observe(el))
+    return () => observer.disconnect()
+  }, [meses])
+
+  // Corrige o scroll depois de um prepend (ver prependAdjustRef acima).
+  React.useLayoutEffect(() => {
+    if (prependAdjustRef.current == null) return
+    const diff = document.documentElement.scrollHeight - prependAdjustRef.current
+    if (diff > 0) window.scrollBy(0, diff)
+    prependAdjustRef.current = null
+  }, [meses])
+
+  // Rolagem infinita: sentinelas finas no topo e no fim do feed. Rolar perto
+  // delas carrega mais um mês, até os limites de segurança.
+  React.useEffect(() => {
+    const topEl = topSentinelRef.current
+    const bottomEl = bottomSentinelRef.current
+    if (!topEl || !bottomEl) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue
+          if (entry.target === bottomEl) {
+            setMeses((ms) => {
+              const ultimo = ms[ms.length - 1]
+              if (!ultimo || ultimo.getTime() >= addMonths(hoje0, LIMITE_FUTURO).getTime()) return ms
+              return [...ms, addMonths(ultimo, 1)]
+            })
+          } else if (entry.target === topEl) {
+            setMeses((ms) => {
+              const primeiro = ms[0]
+              if (!primeiro || primeiro.getTime() <= addMonths(hoje0, -LIMITE_PASSADO).getTime()) return ms
+              prependAdjustRef.current = document.documentElement.scrollHeight
+              return [addMonths(primeiro, -1), ...ms]
+            })
+          }
+        }
+      },
+      { rootMargin: "800px 0px 800px 0px" }
+    )
+    observer.observe(topEl)
+    observer.observe(bottomEl)
+    return () => observer.disconnect()
+  }, [hoje0])
+
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      scrollToMonth(date, opts) {
+        const alvo = startOfMonth(date)
+        const key = monthKey(alvo)
+
+        const tentar = () => {
+          const el = sectionRefs.current.get(key)
+          if (!el) return false
+          el.scrollIntoView({ behavior: opts?.instant ? "auto" : "smooth", block: "start" })
+          return true
+        }
+
+        if (tentar()) return
+
+        // Mês ainda não carregado no feed — estica o range pra incluir o
+        // alvo e tenta rolar de novo no próximo frame, já com o DOM pronto.
+        setMeses((ms) => {
+          const primeiro = ms[0]
+          const ultimo = ms[ms.length - 1]
+          if (alvo.getTime() < primeiro.getTime()) {
+            const novos: Date[] = []
+            for (let d = alvo; d.getTime() < primeiro.getTime(); d = addMonths(d, 1)) novos.push(d)
+            return [...novos, ...ms]
+          }
+          if (alvo.getTime() > ultimo.getTime()) {
+            const novos: Date[] = []
+            for (let d = addMonths(ultimo, 1); d.getTime() <= alvo.getTime(); d = addMonths(d, 1)) novos.push(d)
+            return [...ms, ...novos]
+          }
+          return ms
+        })
+        requestAnimationFrame(() => requestAnimationFrame(tentar))
+      },
+    }),
+    []
+  )
+
+  return (
+    <div className="flex flex-col">
+      <div ref={topSentinelRef} aria-hidden="true" className="h-px" />
+      <div className="flex flex-col gap-10">
+        {meses.map((mes) => (
+          <MonthSection
+            key={monthKey(mes)}
+            mes={mes}
+            sectionRef={setSectionRef(monthKey(mes))}
+            casas={casas}
+            reservasCasa={reservasCasa}
+            modoTodasCasas={modoTodasCasas}
+            selectedReservaId={selectedReservaId}
+            onSelectReserva={onSelectReserva}
+          />
+        ))}
+      </div>
+      <div ref={bottomSentinelRef} aria-hidden="true" className="h-px" />
+
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-border pt-3 text-[11px] text-muted-foreground">
+        {modoTodasCasas
+          ? casas.map((c) => (
+              <span key={c.id} className="flex items-center gap-1.5">
+                <span className="size-2 rounded-full" style={{ background: corDaCasa(casas, c.id) }} />
+                {c.nome}
+              </span>
+            ))
+          : (["Airbnb", "Booking", "Outro"] as const).map((p) => (
+              <span key={p} className="flex items-center gap-1.5">
+                <span className="size-2 rounded-full" style={{ background: PLATFORM_COLOR[p] }} />
+                {p}
+              </span>
+            ))}
+        <span className="flex items-center gap-1.5 text-rose-700 dark:text-destructive/80">
+          <DoorOpen className="size-3" />
+          Saída (check-out)
+        </span>
+      </div>
+    </div>
+  )
+})
