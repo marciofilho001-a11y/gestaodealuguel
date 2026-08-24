@@ -37,7 +37,10 @@ const td = "px-4 py-3"
 function GanhosCard({ label, value, hero, index }: { label: string; value: string; hero?: boolean; index: number }) {
   return (
     <Card
-      className="animate-stagger-in min-w-0 gap-1 overflow-hidden rounded-xl border p-4 data-[hero=true]:border-foreground data-[hero=true]:bg-foreground data-[hero=true]:text-background"
+      // Sem `border`/`rounded-xl`/`overflow-hidden` explícitos — o Card já
+      // declara essa elevação sozinho (ring sutil + sombra em duas camadas);
+      // duplicar com uma borda literal por cima vira "ghost card".
+      className="animate-stagger-in min-w-0 gap-1 p-4 data-[hero=true]:border-foreground data-[hero=true]:bg-foreground data-[hero=true]:text-background"
       data-hero={hero}
       style={{ animationDelay: `${index * 55}ms` }}
     >
@@ -57,17 +60,24 @@ function GanhosCard({ label, value, hero, index }: { label: string; value: strin
   )
 }
 
-// Paleta fixa (não segue os tokens --chart-N do tema) — série de dados tem
-// cor própria por convenção, igual em claro e escuro, em vez de herdar as
-// cores genéricas de gráfico do tema (que incluíam um rosa saturado aqui).
+// Paleta fixa (não segue os tokens --chart-N do tema, que incluíam um rosa
+// saturado) — validada com o método/validador do skill dataviz (6 checks:
+// faixa de luminosidade OKLCH, croma, separação CVD, piso de visão normal e
+// contraste ≥3:1) contra as superfícies reais dos cards (#FFFFFF no claro,
+// #18181B no escuro). Passa nos dois modos com o MESMO hex — por isso segue
+// igual em claro e escuro, e não precisa de variantes por tema.
 const chartConfig = {
   bruto: { label: "Bruto", color: "#6366f1" }, // índigo
-  liquido: { label: "Líquido", color: "#10b981" }, // esmeralda
+  liquido: { label: "Líquido", color: "#059669" }, // esmeralda (600 — o 500 furava o contraste 3:1 no claro e a faixa de luminosidade no escuro)
   comissao: { label: "Comissão", color: "#8b5cf6" }, // violeta
 } satisfies ChartConfig
 
+// Violeta mais escuro que o da Comissão acima — mesma família (reforça
+// "violeta = comissão" como convenção visual), mas um tom próprio validado à
+// parte porque esse gráfico é de série única (sem legenda, sem par CVD a
+// checar; só luminosidade/contraste contam aqui).
 const marcioChartConfig = {
-  comissaoMarcio: { label: "Comissão Marcio Filho", color: "#a78bfa" }, // violeta suave
+  comissaoMarcio: { label: "Comissão Marcio Filho", color: "#7c3aed" },
 } satisfies ChartConfig
 
 // "R$ 200" abaixo de mil (evita vários ticks repetindo "R$0k" quando os

@@ -53,7 +53,10 @@ function SummaryCard({
   return (
     <Card
       className={cn(
-        "animate-stagger-in min-w-0 gap-1 overflow-hidden rounded-xl border p-4",
+        // Sem `border`/`rounded-xl`/`overflow-hidden` explícitos — o Card já
+        // declara essa elevação sozinho (ring sutil + sombra em duas
+        // camadas); duplicar com uma borda literal por cima vira "ghost card".
+        "animate-stagger-in min-w-0 gap-1 p-4",
         hero ? "border-foreground bg-foreground text-background" : "bg-card"
       )}
       style={{ animationDelay: `${index * 55}ms` }}
