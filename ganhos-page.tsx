@@ -1,12 +1,12 @@
 import * as React from "react"
-import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from "recharts"
+import { Cell, Pie, PieChart } from "recharts"
 import { ArrowLeft, UserRound, Wallet } from "lucide-react"
 import { Link } from "react-router-dom"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip } from "@/components/ui/chart"
+import { ChartContainer, ChartTooltip } from "@/components/ui/chart"
 import type { ChartConfig } from "@/components/ui/chart"
 import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Field, FieldLabel } from "@/components/ui/field"
@@ -15,7 +15,7 @@ import { ReservasDrilldownDialog } from "@/components/reservas-drilldown-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatBRL, primeiroDiaMes, ultimoDiaMes } from "@/lib/format"
-import { PLATFORM_BADGE } from "@/lib/platform"
+import { PLATFORM_BADGE, PLATFORM_COLOR } from "@/lib/platform"
 import { cn } from "@/lib/utils"
 import type { CasaSelecionada } from "@/hooks/use-aluguel-data"
 import type { Casa, Reserva } from "@/types"
@@ -48,11 +48,12 @@ function GanhosCard({ label, value, hero, index }: { label: string; value: strin
         {label}
       </div>
       <div
-        className={
-          hero
-            ? "truncate font-display text-2xl font-semibold tracking-wide tabular-nums sm:text-3xl"
-            : "truncate font-heading text-xl font-bold tracking-tight tabular-nums sm:text-2xl"
-        }
+        className={cn(
+          // Mesma família (Space Grotesk) do resto dos cards — o hero só
+          // ganha destaque por tamanho/peso/cor, não por trocar de fonte.
+          "truncate font-heading tracking-tight tabular-nums",
+          hero ? "text-2xl font-bold sm:text-3xl" : "text-xl font-bold sm:text-2xl"
+        )}
       >
         {value}
       </div>
@@ -60,76 +61,44 @@ function GanhosCard({ label, value, hero, index }: { label: string; value: strin
   )
 }
 
-// Paleta fixa (não segue os tokens --chart-N do tema, que incluíam um rosa
-// saturado) — validada com o método/validador do skill dataviz (6 checks:
-// faixa de luminosidade OKLCH, croma, separação CVD, piso de visão normal e
-// contraste ≥3:1) contra as superfícies reais dos cards (#FFFFFF no claro,
-// #18181B no escuro). Passa nos dois modos com o MESMO hex — por isso segue
-// igual em claro e escuro, e não precisa de variantes por tema.
-const chartConfig = {
-  bruto: { label: "Bruto", color: "#6366f1" }, // índigo
-  liquido: { label: "Líquido", color: "#059669" }, // esmeralda (600 — o 500 furava o contraste 3:1 no claro e a faixa de luminosidade no escuro)
-  comissao: { label: "Comissão", color: "#8b5cf6" }, // violeta
-} satisfies ChartConfig
+// Paleta da barra segmentada (Líquido/Taxas/Marcio) e do donut — validada
+// com o validador do skill dataviz (6 checks: faixa OKLCH, croma, separação
+// CVD, piso de visão normal, contraste) contra as superfícies reais dos
+// cards (#FFFFFF claro / #18181B escuro). O pedido original pedia índigo
+// pras "Taxas da Plataforma", mas índigo #6366f1 ficou a ΔE 6.3 (piso de
+// visão normal) do violeta da Comissão Marcio ao lado — imperceptível até
+// pra quem enxerga cores normalmente. Trocado por âmbar, que abre distância
+// nos três pares e ainda passa em claro e escuro com o mesmo hex.
+const COR_LIQUIDO = "#059669" // esmeralda 600 — mesma cor já validada no resto da página
+const COR_TAXAS_PLATAFORMA = "#d97706" // âmbar 600
+const COR_COMISSAO_MARCIO = "#7c3aed" // violeta 600 — mesma cor já validada no resto da página
 
-// Violeta mais escuro que o da Comissão acima — mesma família (reforça
-// "violeta = comissão" como convenção visual), mas um tom próprio validado à
-// parte porque esse gráfico é de série única (sem legenda, sem par CVD a
-// checar; só luminosidade/contraste contam aqui).
-const marcioChartConfig = {
-  comissaoMarcio: { label: "Comissão Marcio Filho", color: "#7c3aed" },
-} satisfies ChartConfig
-
-// "R$ 200" abaixo de mil (evita vários ticks repetindo "R$0k" quando os
-// valores são pequenos, como na comissão do Marcio); "R$3k" a partir daí.
-function formatEixoY(v: number): string {
-  const abs = Math.round(Math.abs(v))
-  return abs < 1000 ? `R$ ${abs}` : `R$${Math.round(v / 1000)}k`
-}
-
-interface ChartTooltipBRLPayloadItem {
+interface DonutTooltipPayloadItem {
+  name?: string
   value?: number | string
-  color?: string
-  dataKey?: string | number
+  payload?: { color?: string }
 }
 
-// Tooltip flutuante translúcido — deliberadamente mais escuro/opaco que o
-// resto do card mesmo no tema claro (padrão comum em dashboards, dá
-// contraste extra sobre a área do gráfico), mas com uma variante clara
-// pro tema claro pra não ficar ilegível lá.
-function ChartTooltipBRL({
-  active,
-  payload,
-  label,
-  config,
-}: {
-  active?: boolean
-  payload?: ChartTooltipBRLPayloadItem[]
-  label?: string
-  config: ChartConfig
-}) {
+// Tooltip flutuante do donut — mesmo padrão zinc/branco fixo (igual em claro
+// e escuro) já usado nos outros elementos de gráfico desta página.
+function DonutTooltip({ active, payload }: { active?: boolean; payload?: DonutTooltipPayloadItem[] }) {
   if (!active || !payload?.length) return null
+  const item = payload[0]
   return (
     <div className="rounded-xl border border-zinc-200 bg-white/95 p-3 text-xs font-medium text-zinc-900 shadow-lg dark:border-zinc-800 dark:bg-zinc-900/90 dark:text-zinc-100">
-      {label && <div className="mb-1.5 font-medium">{label}</div>}
-      <div className="grid gap-1.5">
-        {payload.map((item, i) => {
-          const key = String(item.dataKey ?? "")
-          const itemLabel = config[key]?.label ?? key
-          return (
-            <div key={i} className="flex items-center gap-2">
-              <span className="size-2 shrink-0 rounded-full" style={{ background: item.color }} />
-              <span className="text-muted-foreground dark:text-zinc-400">{itemLabel}</span>
-              <span className="ml-auto pl-3 font-mono font-semibold tabular-nums">
-                {formatBRL(Number(item.value))}
-              </span>
-            </div>
-          )
-        })}
+      <div className="flex items-center gap-2">
+        <span className="size-2 shrink-0 rounded-full" style={{ background: item.payload?.color }} />
+        <span className="text-muted-foreground dark:text-zinc-400">{item.name}</span>
+        <span className="ml-auto pl-3 font-mono font-semibold tabular-nums">{formatBRL(Number(item.value))}</span>
       </div>
     </div>
   )
 }
+
+// ChartContainer exige um ChartConfig, mas o donut colore cada fatia via
+// <Cell fill> direto (cor por entidade/plataforma, não por --color-N do
+// tema) — não há série alguma pra declarar aqui.
+const donutChartConfig = {} satisfies ChartConfig
 
 export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
   const [casaFiltro, setCasaFiltro] = React.useState(() => (typeof casaAtualId === "number" ? String(casaAtualId) : todasValue))
@@ -221,32 +190,21 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
 
   const nomeCasa = casaFiltro === todasValue ? "Todas as casas" : casas.find((c) => c.id === Number(casaFiltro))?.nome
 
-  // Ordenado decrescente por bruto (regra da própria base de UX: sempre ordenar
-  // por magnitude quando o insight principal é comparação/ranking)
-  const chartData = React.useMemo(() => {
-    const base = resultado.porCasa.length
-      ? resultado.porCasa.map((c) => ({ nome: c.nome, bruto: c.bruto, liquido: c.liquido, comissao: c.comissao }))
-      : Object.entries(resultado.porPlataforma).map(([plataforma, v]) => ({
-          nome: plataforma,
-          bruto: v.bruto,
-          liquido: v.bruto - v.comissao - v.comissaoMarcio,
-          comissao: v.comissao,
-        }))
-    return [...base].sort((a, b) => b.bruto - a.bruto)
-  }, [resultado])
-
-  // Panorama dedicado da Comissão Marcio Filho — mesma lógica do gráfico
-  // principal (por casa quando "todas as casas", por plataforma quando uma
-  // casa específica está selecionada), sempre respeitando os filtros do topo
-  const marcioChartData = React.useMemo(() => {
-    const base = resultado.porCasa.length
-      ? resultado.porCasa.map((c) => ({ nome: c.nome, comissaoMarcio: c.comissaoMarcio, casaId: c.id }))
-      : Object.entries(resultado.porPlataforma).map(([plataforma, v]) => ({
-          nome: plataforma,
-          comissaoMarcio: v.comissaoMarcio,
-          plataforma,
-        }))
-    return [...base].sort((a, b) => b.comissaoMarcio - a.comissaoMarcio)
+  // Fatias do donut de Comissão Marcio Filho — sempre por plataforma (é a
+  // identidade que dá cor à fatia via PLATFORM_COLOR, a mesma usada nos
+  // badges e no calendário). Fatias zeradas ficam de fora do donut.
+  const donutData = React.useMemo(() => {
+    const total = resultado.comissaoMarcioTotal
+    return Object.entries(resultado.porPlataforma)
+      .map(([plataforma, v]) => ({
+        nome: plataforma,
+        plataforma,
+        valor: v.comissaoMarcio,
+        color: PLATFORM_COLOR[plataforma] || PLATFORM_COLOR.Outro,
+        pct: total > 0 ? (v.comissaoMarcio / total) * 100 : 0,
+      }))
+      .filter((d) => d.valor > 0)
+      .sort((a, b) => b.valor - a.valor)
   }, [resultado])
 
   const [drilldown, setDrilldown] = React.useState<{
@@ -357,158 +315,179 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
             <GanhosCard index={6} label="Descontos" value={formatBRL(resultado.descontoTotal)} />
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                Bruto, líquido e comissão — {resultado.porCasa.length ? "por casa" : "por plataforma"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer config={chartConfig} className="h-[420px] w-full">
-                <BarChart data={chartData} margin={{ top: 24, left: -12, right: 12 }} barCategoryGap="18%" barGap={4}>
-                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                  <XAxis dataKey="nome" tickLine={false} axisLine={false} tickMargin={10} fontSize={12} />
-                  <YAxis tickLine={false} axisLine={false} fontSize={11} width={64} tickFormatter={formatEixoY} />
-                  <ChartTooltip
-                    cursor={{ fill: "var(--muted)", opacity: 0.4 }}
-                    content={<ChartTooltipBRL config={chartConfig} />}
-                  />
-                  <ChartLegend content={<ChartLegendContent indicatorClassName="size-2.5 rounded-full" />} />
-                  <Bar dataKey="bruto" fill="var(--color-bruto)" radius={[6, 6, 0, 0]} maxBarSize={32} />
-                  <Bar dataKey="liquido" fill="var(--color-liquido)" radius={[6, 6, 0, 0]} maxBarSize={32} />
-                  <Bar dataKey="comissao" fill="var(--color-comissao)" radius={[6, 6, 0, 0]} maxBarSize={32} />
-                </BarChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.3fr_1fr]">
-            {resultado.porCasa.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Por casa</CardTitle>
-                  <p className="text-[11px] text-muted-foreground/70">Clique numa linha pra ver as reservas.</p>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className={th}>Casa</TableHead>
-                          <TableHead className={cn(th, "text-right")}>Reservas</TableHead>
-                          <TableHead className={cn(th, "text-right")}>Bruto</TableHead>
-                          <TableHead className={cn(th, "text-right")}>Líquido</TableHead>
-                          <TableHead className={cn(th, "text-right")}>Comissão</TableHead>
-                          <TableHead className={cn(th, "text-right")}>Marcio</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {resultado.porCasa.map((c) => (
-                          <TableRow
-                            key={c.id}
-                            className="cursor-pointer hover:bg-accent/60"
-                            onClick={() => abrirDrilldownCasa(c.id, c.nome)}
-                          >
-                            <TableCell className={cn(td, "font-medium")}>{c.nome}</TableCell>
-                            <TableCell className={cn(td, "text-right font-mono tabular-nums")}>{c.qtd}</TableCell>
-                            <TableCell className={cn(td, "text-right font-mono font-semibold tabular-nums")}>
-                              {formatBRL(c.bruto)}
-                            </TableCell>
-                            <TableCell className={cn(td, "text-right font-mono font-semibold tabular-nums")}>
-                              {formatBRL(c.liquido)}
-                            </TableCell>
-                            <TableCell className={cn(td, "text-right font-mono tabular-nums text-muted-foreground")}>
-                              {formatBRL(c.comissao)}
-                            </TableCell>
-                            <TableCell className={cn(td, "text-right font-mono tabular-nums text-muted-foreground")}>
-                              {formatBRL(c.comissaoMarcio)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
+          {resultado.porCasa.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Por plataforma</CardTitle>
+                <CardTitle className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Por casa</CardTitle>
                 <p className="text-[11px] text-muted-foreground/70">Clique numa linha pra ver as reservas.</p>
               </CardHeader>
-              <CardContent className="space-y-1.5">
-                {Object.entries(resultado.porPlataforma).map(([plat, v]) => (
+              <CardContent>
+                <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className={th}>Casa</TableHead>
+                        <TableHead className={cn(th, "text-right")}>Reservas</TableHead>
+                        <TableHead className={cn(th, "text-right")}>Bruto</TableHead>
+                        <TableHead className={cn(th, "text-right")}>Líquido</TableHead>
+                        <TableHead className={cn(th, "text-right")}>Comissão</TableHead>
+                        <TableHead className={cn(th, "text-right")}>Marcio</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {resultado.porCasa.map((c) => (
+                        <TableRow
+                          key={c.id}
+                          className="cursor-pointer hover:bg-accent/60"
+                          onClick={() => abrirDrilldownCasa(c.id, c.nome)}
+                        >
+                          <TableCell className={cn(td, "font-medium")}>{c.nome}</TableCell>
+                          <TableCell className={cn(td, "text-right font-mono tabular-nums")}>{c.qtd}</TableCell>
+                          <TableCell className={cn(td, "text-right font-mono font-semibold tabular-nums")}>
+                            {formatBRL(c.bruto)}
+                          </TableCell>
+                          <TableCell className={cn(td, "text-right font-mono font-semibold tabular-nums")}>
+                            {formatBRL(c.liquido)}
+                          </TableCell>
+                          <TableCell className={cn(td, "text-right font-mono tabular-nums text-muted-foreground")}>
+                            {formatBRL(c.comissao)}
+                          </TableCell>
+                          <TableCell className={cn(td, "text-right font-mono tabular-nums text-muted-foreground")}>
+                            {formatBRL(c.comissaoMarcio)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Coluna esquerda — um card por plataforma, no lugar do gráfico
+                de barras vertical: mesmos dados (qtd, bruto, líquido, taxas,
+                comissão Marcio), lidos em texto em vez de altura de barra. */}
+            <div className="flex flex-col gap-4">
+              <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Desempenho por plataforma</h2>
+              {Object.entries(resultado.porPlataforma).map(([plat, v], i) => {
+                const liquido = v.bruto - v.comissao - v.comissaoMarcio
+                const pctLiquido = v.bruto > 0 ? (liquido / v.bruto) * 100 : 0
+                const pctTaxas = v.bruto > 0 ? (v.comissao / v.bruto) * 100 : 0
+                const pctMarcio = v.bruto > 0 ? (v.comissaoMarcio / v.bruto) * 100 : 0
+                return (
                   <button
                     key={plat}
                     type="button"
                     onClick={() => abrirDrilldownPlataforma(plat)}
-                    className="flex w-full items-center gap-3 rounded-lg border border-zinc-200 px-4 py-3 text-left text-xs transition-colors hover:bg-accent/60 dark:border-zinc-800"
+                    className="animate-stagger-in flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-card p-5 text-left shadow-sm transition-colors hover:bg-accent/40 dark:border-zinc-800"
+                    style={{ animationDelay: `${i * 55}ms` }}
                   >
-                    <Badge variant="outline" className={cn("gap-1.5", PLATFORM_BADGE[plat] || PLATFORM_BADGE.Outro)}>
-                      <PlatformIcon plataforma={plat} size="sm" />
-                      {plat}
-                    </Badge>
-                    <span className="text-muted-foreground">{v.qtd} reserva(s)</span>
-                    <span className="ml-auto font-mono font-semibold tabular-nums">{formatBRL(v.bruto)}</span>
-                    <span className="font-mono tabular-nums text-muted-foreground">− {formatBRL(v.comissao)} comissão</span>
-                    <span className="font-mono tabular-nums text-muted-foreground">− {formatBRL(v.comissaoMarcio)} Marcio</span>
-                  </button>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
+                    <div className="flex items-center gap-3">
+                      <Badge variant="outline" className={cn("gap-1.5", PLATFORM_BADGE[plat] || PLATFORM_BADGE.Outro)}>
+                        <PlatformIcon plataforma={plat} size="sm" />
+                        {plat}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">{v.qtd} reserva(s)</span>
+                      <span className="ml-auto font-mono text-lg font-bold tabular-nums">{formatBRL(v.bruto)}</span>
+                    </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                    {/* Barra segmentada — mesma proporção visual do bruto que
+                        as três parcelas (líquido/taxas/comissão) representam;
+                        gap de 2px entre segmentos é a mesma separação por
+                        contraste que os rótulos abaixo reforçam em texto. */}
+                    <div className="flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                      <div className="h-full rounded-full" style={{ width: `${pctLiquido}%`, background: COR_LIQUIDO }} />
+                      <div className="h-full rounded-full" style={{ width: `${pctTaxas}%`, background: COR_TAXAS_PLATAFORMA }} />
+                      <div className="h-full rounded-full" style={{ width: `${pctMarcio}%`, background: COR_COMISSAO_MARCIO }} />
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-zinc-500 dark:text-zinc-400">
+                      <span className="flex items-center gap-1.5">
+                        <span className="size-1.5 shrink-0 rounded-full" style={{ background: COR_LIQUIDO }} />
+                        Líquido <b className="tabular-nums text-foreground">{formatBRL(liquido)}</b>
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="size-1.5 shrink-0 rounded-full" style={{ background: COR_TAXAS_PLATAFORMA }} />
+                        Taxas <b className="tabular-nums text-foreground">{formatBRL(v.comissao)}</b>
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="size-1.5 shrink-0 rounded-full" style={{ background: COR_COMISSAO_MARCIO }} />
+                        Marcio <b className="tabular-nums text-foreground">{formatBRL(v.comissaoMarcio)}</b>
+                      </span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Coluna direita — resumo da Comissão Marcio Filho + donut de
+                distribuição por plataforma, no lugar do gráfico de barra
+                única (que não tinha o que comparar, já que era 1 série só). */}
+            <div className="flex flex-col gap-4">
+              <h2 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
                 <UserRound className="size-3.5" />
-                Comissão Marcio Filho — panorama {resultado.porCasa.length ? "por casa" : "por plataforma"}
-              </CardTitle>
-              <p className="text-[11px] text-muted-foreground/70">Clique numa barra pra ver quais reservas formaram esse valor.</p>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer config={marcioChartConfig} className="h-72 w-full">
-                <BarChart data={marcioChartData} margin={{ top: 24, left: -12, right: 12 }} barCategoryGap="30%">
-                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                  <XAxis dataKey="nome" tickLine={false} axisLine={false} tickMargin={10} fontSize={12} />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    fontSize={11}
-                    width={64}
-                    domain={[0, "dataMax + 100"]}
-                    tickFormatter={formatEixoY}
-                  />
-                  <ChartTooltip
-                    cursor={{ fill: "var(--muted)", opacity: 0.4 }}
-                    content={<ChartTooltipBRL config={marcioChartConfig} />}
-                  />
-                  <Bar
-                    dataKey="comissaoMarcio"
-                    fill="var(--color-comissaoMarcio)"
-                    radius={[6, 6, 0, 0]}
-                    maxBarSize={36}
-                    className="cursor-pointer"
-                    onClick={(data: { payload?: { nome: string; casaId?: number; plataforma?: string } }) => {
-                      const item = data.payload
-                      if (!item) return
-                      if (item.casaId !== undefined) abrirDrilldownCasa(item.casaId, item.nome)
-                      else if (item.plataforma) abrirDrilldownPlataforma(item.plataforma)
-                    }}
-                  >
-                    <LabelList
-                      dataKey="comissaoMarcio"
-                      position="top"
-                      fontSize={10}
-                      className="fill-foreground tabular-nums"
-                      formatter={(v: React.ReactNode) => formatBRL(Number(v))}
-                    />
-                  </Bar>
-                </BarChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
+                Comissão Marcio Filho
+              </h2>
+
+              <div className="rounded-2xl border border-zinc-200 bg-card p-5 shadow-sm dark:border-zinc-800">
+                <div className="text-xs text-muted-foreground">Total acumulado no período</div>
+                {/* violet-600/400 pedido explicitamente pelo dono — mesma cor
+                    da fatia "Comissão Marcio" na barra segmentada e no
+                    donut logo abaixo, não um roxo decorativo solto. */}
+                <div className="mt-1 font-mono text-2xl font-bold tabular-nums text-violet-600 dark:text-violet-400">
+                  {formatBRL(resultado.comissaoMarcioTotal)}
+                </div>
+              </div>
+
+              <div className="flex flex-1 flex-col rounded-2xl border border-zinc-200 bg-card p-5 shadow-sm dark:border-zinc-800">
+                <div className="mb-3 text-xs font-medium text-muted-foreground">Distribuição por plataforma</div>
+                {donutData.length > 0 ? (
+                  <div className="flex flex-1 items-center gap-6">
+                    <ChartContainer config={donutChartConfig} className="mx-auto aspect-square h-36 w-36 shrink-0">
+                      <PieChart>
+                        <ChartTooltip content={<DonutTooltip />} />
+                        <Pie
+                          data={donutData}
+                          dataKey="valor"
+                          nameKey="nome"
+                          innerRadius="62%"
+                          outerRadius="100%"
+                          paddingAngle={3}
+                          strokeWidth={0}
+                        >
+                          {donutData.map((d) => (
+                            <Cell key={d.nome} fill={d.color} />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                    </ChartContainer>
+                    <div className="flex flex-1 flex-col gap-2">
+                      {donutData.map((d) => (
+                        <button
+                          key={d.nome}
+                          type="button"
+                          onClick={() => abrirDrilldownPlataforma(d.plataforma)}
+                          className="flex items-center gap-2 rounded-md text-left text-xs transition-opacity hover:opacity-70"
+                        >
+                          <span className="size-2 shrink-0 rounded-full" style={{ background: d.color }} />
+                          <span className="flex-1 truncate">{d.nome}</span>
+                          <span className="font-mono tabular-nums text-muted-foreground">{d.pct.toFixed(0)}%</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <Empty className="flex-1 py-6">
+                    <EmptyMedia variant="icon">
+                      <UserRound />
+                    </EmptyMedia>
+                    <EmptyDescription>Nenhuma comissão registrada nesse período.</EmptyDescription>
+                  </Empty>
+                )}
+              </div>
+            </div>
+          </div>
         </>
       )}
 
