@@ -92,6 +92,9 @@
     --chart-3: #8B5CF6;
     --chart-4: #EC4899;
     --chart-5: #059669;
+    /* Grade de fundo dos gráficos (Setor de Ganhos) — neutra (zinc), independente
+       da paleta quente do app, igual ao tooltip que já é zinc/branco fixo. */
+    --chart-grid: #E4E4E7;
     --radius: 0.65rem;
     --sidebar: #FFFFFF;
     --sidebar-foreground: #52525B;
@@ -140,6 +143,7 @@
     --chart-3: #A78BFA;
     --chart-4: #F472B6;
     --chart-5: #10B981;
+    --chart-grid: rgba(255,255,255,.08);
     --sidebar: #09090B;
     --sidebar-foreground: #A1A1AA;
     --sidebar-primary: #0D9488;

@@ -148,7 +148,7 @@ export function EditarReservaDialog({ reserva, comissaoMarcioPercentual, onOpenC
               onChange={(e) => setValorAluguel(e.target.value)}
             />
             {noites > 0 && valorAluguel && (
-              <span className="text-[11px] text-muted-foreground">≈ {formatBRL(mediaPorNoite)} / noite</span>
+              <span className="text-[11px] tabular-nums text-muted-foreground">≈ {formatBRL(mediaPorNoite)} / noite</span>
             )}
           </Field>
           <Field>
