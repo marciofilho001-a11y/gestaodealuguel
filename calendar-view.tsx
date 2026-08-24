@@ -172,7 +172,7 @@ function MonthSection({
   return (
     <section ref={sectionRef} data-month-key={key} className="scroll-mt-16">
       <div className="mb-3 flex items-baseline gap-2.5 px-0.5">
-        <h2 className="text-2xl font-bold capitalize text-foreground">{nomeMes}</h2>
+        <h2 className="text-2xl font-bold tracking-tight text-foreground capitalize">{nomeMes}</h2>
         {ehMesAtual && (
           <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
             <span className="size-1.5 rounded-full bg-primary" />

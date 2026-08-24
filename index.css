@@ -195,6 +195,27 @@
       animation: none;
     }
   }
+
+  /* Escala de texto pra métricas e dados (cards de resumo, cabeçalhos de
+     seção) — 3 níveis de hierarquia, sempre nos tokens de cor do app (nunca
+     zinc fixo), então funcionam nos dois temas sem regra duplicada.
+     Nenhuma delas define cor: quem usa decide (`text-muted-foreground` no
+     caso comum, outra cor pro card "hero" com fundo invertido) — assim dá
+     pra sobrepor com `cn()` sem depender da ordem em que o Tailwind emite
+     as regras (duas classes de cor concorrendo pela mesma especificidade é
+     imprevisível).
+     .text-eyebrow        — rótulo pequeno acima de um número ("Total do Mês")
+     .text-section-title  — título de card/seção (não é rótulo, não é hero)
+     .text-stat-value     — o número em destaque em si */
+  .text-eyebrow {
+    @apply text-xs font-medium tracking-wider uppercase;
+  }
+  .text-section-title {
+    @apply text-sm font-medium;
+  }
+  .text-stat-value {
+    @apply font-mono text-2xl font-bold tracking-tight tabular-nums;
+  }
 }
 
 @layer base {

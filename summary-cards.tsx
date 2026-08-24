@@ -58,7 +58,7 @@ function SummaryCard({
       )}
       style={{ animationDelay: `${index * 55}ms` }}
     >
-      <div className={cn("truncate text-xs font-medium", hero ? "text-background/65" : "text-muted-foreground")}>
+      <div className={cn("text-eyebrow truncate", hero ? "text-background/65" : "text-muted-foreground")}>
         {label}
       </div>
       <div

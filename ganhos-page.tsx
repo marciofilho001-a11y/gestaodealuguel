@@ -34,7 +34,7 @@ const todasValue = "__todas__"
 // Espaçamento generoso pras tabelas do Setor de Ganhos — mesmo padrão já
 // usado no drilldown de reservas (px-4 py-3), em vez do p-2 compacto padrão
 // do componente Table genérico.
-const th = "px-4 py-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+const th = "text-eyebrow px-4 py-3 text-muted-foreground"
 const td = "px-4 py-3"
 
 function GanhosCard({ label, value, hero, index }: { label: string; value: string; hero?: boolean; index: number }) {
@@ -44,7 +44,7 @@ function GanhosCard({ label, value, hero, index }: { label: string; value: strin
       data-hero={hero}
       style={{ animationDelay: `${index * 55}ms` }}
     >
-      <div className="truncate text-xs font-medium text-muted-foreground group-data-[hero=true]/card:text-background/65">
+      <div className="text-eyebrow truncate text-muted-foreground group-data-[hero=true]/card:text-background/65">
         {label}
       </div>
       <div
@@ -386,7 +386,7 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
           {resultado.porCasa.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Por casa</CardTitle>
+                <CardTitle className="text-section-title text-foreground/80">Por casa</CardTitle>
                 <p className="text-[11px] text-muted-foreground/70">Clique numa linha pra ver as reservas.</p>
               </CardHeader>
               <CardContent>
@@ -437,7 +437,7 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
                 de barras vertical: mesmos dados (qtd, bruto, líquido, taxas,
                 comissão Marcio), lidos em texto em vez de altura de barra. */}
             <div className="flex flex-col gap-4">
-              <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Desempenho por plataforma</h2>
+              <h2 className="text-section-title text-foreground/80">Desempenho por plataforma</h2>
               {Object.entries(resultado.porPlataforma).map(([plat, v], i) => {
                 const liquido = v.bruto - v.comissao - v.comissaoMarcio
                 const pctLiquido = v.bruto > 0 ? (liquido / v.bruto) * 100 : 0
@@ -491,7 +491,7 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
                 distribuição por plataforma, no lugar do gráfico de barra
                 única (que não tinha o que comparar, já que era 1 série só). */}
             <div className="flex flex-col gap-4">
-              <h2 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+              <h2 className="text-section-title flex items-center gap-2 text-foreground/80">
                 <UserRound className="size-3.5" />
                 Comissão Marcio Filho
               </h2>
