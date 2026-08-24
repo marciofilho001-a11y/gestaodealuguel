@@ -63,8 +63,8 @@ function SummaryCard({
       </div>
       <div
         className={cn(
-          "truncate font-heading text-xl font-bold tracking-tight tabular-nums sm:text-2xl",
-          hero && "font-display text-2xl font-semibold tracking-wide tabular-nums sm:text-3xl"
+          "truncate font-mono text-xl font-bold tracking-tight tabular-nums sm:text-2xl",
+          hero && "text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl"
         )}
       >
         {value}

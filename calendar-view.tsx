@@ -63,10 +63,10 @@ function ReservaDayCard({ reserva, casas, modoTodasCasas, selected, onSelect }: 
         />
         <span className="min-w-0 flex-1 truncate text-[11px] leading-tight font-semibold">{nomeAbreviado}</span>
       </div>
-      <span className="w-full min-w-0 truncate text-[11px] leading-tight text-muted-foreground">
+      <span className="w-full min-w-0 truncate font-mono text-[11px] leading-tight tabular-nums text-muted-foreground">
         → {formatDiaMes(reserva.checkout)}
       </span>
-      <span className="w-full min-w-0 truncate text-[11px] leading-tight font-bold text-emerald-700 dark:text-emerald-400">
+      <span className="w-full min-w-0 truncate font-mono text-[11px] leading-tight font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
         {formatBRLCompacto(reserva.valor_total)}
       </span>
     </button>

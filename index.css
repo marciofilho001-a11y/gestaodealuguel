@@ -1,21 +1,23 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/space-grotesk";
 @import "@fontsource-variable/inter";
+@import "@fontsource-variable/geist";
 @import "@fontsource/ibm-plex-mono/500.css";
 @import "@fontsource/ibm-plex-mono/600.css";
 @import "@fontsource/ibm-plex-mono/700.css";
-@import "@fontsource/cinzel/600.css";
-@import "@fontsource/cinzel/700.css";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: 'Space Grotesk Variable', 'Geist Variable', sans-serif;
+    /* Uma única família tipográfica em toda a interface — Inter, com Geist
+       como reforço. font-heading/font-display existem por compatibilidade
+       com classes já usadas nos componentes, mas resolvem pra mesma fonte:
+       sem serifado decorativo, sem fonte "de destaque" à parte. */
+    --font-heading: 'Inter Variable', 'Geist Variable', sans-serif;
     --font-sans: 'Inter Variable', 'Geist Variable', sans-serif;
     --font-mono: 'IBM Plex Mono', monospace;
-    --font-display: 'Cinzel', serif;
+    --font-display: 'Inter Variable', 'Geist Variable', sans-serif;
     --color-gold: var(--gold);
     --color-gold-soft: var(--gold-soft);
     --color-gold-foreground: var(--gold-foreground);
@@ -64,38 +66,41 @@
 }
 
 :root {
-    --background: #F6F3EE;
-    --foreground: #22302B;
+    /* Paleta neutra (zinc) — nada de fundo creme ou verde saturado. Um único
+       acento de marca (teal) reservado a ações, foco e destaques; o resto da
+       superfície é inteiramente neutro, como Stripe/Linear/Airbnb Host. */
+    --background: #FAFAFA;
+    --foreground: #18181B;
     --card: #FFFFFF;
-    --card-foreground: #22302B;
+    --card-foreground: #18181B;
     --popover: #FFFFFF;
-    --popover-foreground: #22302B;
-    --primary: #1B6B72;
+    --popover-foreground: #18181B;
+    --primary: #0D9488;
     --primary-foreground: #FFFFFF;
-    --secondary: #EFEBE2;
-    --secondary-foreground: #22302B;
-    --muted: #EFEBE2;
-    --muted-foreground: #6B7570;
-    --accent: #DCEBEC;
-    --accent-foreground: #0F4145;
-    --destructive: #B3372C;
-    --border: #E3DED2;
-    --input: #E3DED2;
-    --ring: #1B6B72;
-    --chart-1: #1B6B72;
+    --secondary: #F4F4F5;
+    --secondary-foreground: #18181B;
+    --muted: #F4F4F5;
+    --muted-foreground: #71717A;
+    --accent: #CCFBF1;
+    --accent-foreground: #0F766E;
+    --destructive: #DC2626;
+    --border: rgba(24,24,27,.08);
+    --input: rgba(24,24,27,.12);
+    --ring: #0D9488;
+    --chart-1: #0D9488;
     --chart-2: #C9992B;
     --chart-3: #8B5CF6;
     --chart-4: #EC4899;
     --chart-5: #059669;
     --radius: 0.65rem;
-    --sidebar: #22302B;
-    --sidebar-foreground: #FFFFFF;
-    --sidebar-primary: #1B6B72;
+    --sidebar: #FFFFFF;
+    --sidebar-foreground: #52525B;
+    --sidebar-primary: #0D9488;
     --sidebar-primary-foreground: #FFFFFF;
-    --sidebar-accent: rgba(255,255,255,.08);
-    --sidebar-accent-foreground: #FFFFFF;
-    --sidebar-border: rgba(255,255,255,.14);
-    --sidebar-ring: #1B6B72;
+    --sidebar-accent: #F4F4F5;
+    --sidebar-accent-foreground: #18181B;
+    --sidebar-border: rgba(24,24,27,.08);
+    --sidebar-ring: #0D9488;
 
     /* Cores de marca/identidade — usadas em contextos específicos (badges de
        plataforma, destaques dourados), não são tokens semânticos genéricos */
@@ -109,25 +114,26 @@
 }
 
 .dark {
-    /* Paleta neutra (zinc) — sem tom esverdeado/petróleo; o acento de marca
-       (teal) fica restrito a botões, badges e destaques, nunca no fundo. */
+    /* Mesma lógica neutra, agora em zinc-950/zinc-900: fundo, card e painel
+       formam uma escada de contraste sutil (background < card < hover),
+       com o mesmo acento teal do modo claro. */
     --background: #09090B;
     --foreground: #FAFAFA;
-    --card: #18181B;
+    --card: #121215;
     --card-foreground: #FAFAFA;
-    --popover: #18181B;
+    --popover: #121215;
     --popover-foreground: #FAFAFA;
     --primary: #0D9488;
     --primary-foreground: #FFFFFF;
-    --secondary: #27272A;
+    --secondary: #18181B;
     --secondary-foreground: #FAFAFA;
-    --muted: #27272A;
+    --muted: #18181B;
     --muted-foreground: #A1A1AA;
     --accent: #134E4A;
     --accent-foreground: #5EEAD4;
     --destructive: #DC2626;
-    --border: rgba(255,255,255,.1);
-    --input: rgba(255,255,255,.14);
+    --border: rgba(255,255,255,.08);
+    --input: rgba(255,255,255,.12);
     --ring: #0D9488;
     --chart-1: #0D9488;
     --chart-2: #C9992B;
@@ -135,12 +141,12 @@
     --chart-4: #F472B6;
     --chart-5: #10B981;
     --sidebar: #09090B;
-    --sidebar-foreground: #FAFAFA;
+    --sidebar-foreground: #A1A1AA;
     --sidebar-primary: #0D9488;
     --sidebar-primary-foreground: #FFFFFF;
     --sidebar-accent: rgba(255,255,255,.06);
     --sidebar-accent-foreground: #FAFAFA;
-    --sidebar-border: rgba(255,255,255,.1);
+    --sidebar-border: rgba(255,255,255,.08);
     --sidebar-ring: #0D9488;
 
     --gold: #D9A93B;
@@ -179,14 +185,6 @@
     }
   body {
     @apply bg-background text-foreground;
-    background-image: repeating-linear-gradient(
-      135deg,
-      color-mix(in oklch, var(--foreground) 4%, transparent) 0px,
-      color-mix(in oklch, var(--foreground) 4%, transparent) 1px,
-      transparent 1px,
-      transparent 13px
-    );
-    background-attachment: fixed;
     }
   html {
     @apply font-sans;

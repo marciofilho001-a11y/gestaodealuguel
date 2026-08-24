@@ -15,6 +15,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { corDaCasa } from "@/lib/colors"
+import { cn } from "@/lib/utils"
 import type { Casa } from "@/types"
 import type { CasaSelecionada } from "@/hooks/use-aluguel-data"
 
@@ -38,13 +39,13 @@ export function AppSidebar({
   const location = useLocation()
   return (
     <Sidebar>
-      <SidebarHeader className="gap-0 border-b border-sidebar-border/60 px-3 py-3.5">
+      <SidebarHeader className="gap-0 border-b border-sidebar-border px-3 py-3.5">
         <div className="flex items-center gap-2.5 px-1">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-[#124C52] shadow-sm">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary shadow-sm">
             <Home className="size-4 text-white" strokeWidth={2.3} />
           </span>
-          <div className="font-display text-[15px] leading-tight font-semibold tracking-wide">
-            <span>GESTÃO</span> <span className="text-sidebar-foreground/55">DE ALUGUEL</span>
+          <div className="text-[15px] leading-tight font-semibold tracking-tight">
+            <span>GESTÃO</span> <span className="text-sidebar-foreground/60">DE ALUGUEL</span>
           </div>
         </div>
       </SidebarHeader>
@@ -55,14 +56,28 @@ export function AppSidebar({
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton isActive={casaAtualId === "todas"} onClick={() => onSelectCasa("todas")}>
+                <SidebarMenuButton
+                  isActive={casaAtualId === "todas"}
+                  onClick={() => onSelectCasa("todas")}
+                  className={cn(
+                    "transition-colors duration-150",
+                    casaAtualId === "todas" && "bg-primary/10 font-medium text-primary hover:bg-primary/15 hover:text-primary dark:bg-primary/15 dark:hover:bg-primary/20"
+                  )}
+                >
                   <Grid2x2 />
                   <span>Todas as Casas</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               {casas.map((casa, i) => (
                 <SidebarMenuItem key={casa.id} className="animate-stagger-in" style={{ animationDelay: `${i * 45}ms` }}>
-                  <SidebarMenuButton isActive={casaAtualId === casa.id} onClick={() => onSelectCasa(casa.id)}>
+                  <SidebarMenuButton
+                    isActive={casaAtualId === casa.id}
+                    onClick={() => onSelectCasa(casa.id)}
+                    className={cn(
+                      "transition-colors duration-150",
+                      casaAtualId === casa.id && "bg-primary/10 font-medium text-primary hover:bg-primary/15 hover:text-primary dark:bg-primary/15 dark:hover:bg-primary/20"
+                    )}
+                  >
                     <span
                       className="size-2.5 shrink-0 rounded-full"
                       style={{ background: corDaCasa(casas, casa.id) }}
@@ -72,7 +87,7 @@ export function AppSidebar({
                 </SidebarMenuItem>
               ))}
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={onOpenCasas} className="text-sidebar-foreground/70">
+                <SidebarMenuButton onClick={onOpenCasas} className="text-sidebar-foreground/70 transition-colors duration-150">
                   <PlusCircle />
                   <span>Nova casa</span>
                 </SidebarMenuButton>
@@ -86,7 +101,14 @@ export function AppSidebar({
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={location.pathname === "/ganhos"}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={location.pathname === "/ganhos"}
+                  className={cn(
+                    "transition-colors duration-150",
+                    location.pathname === "/ganhos" && "bg-primary/10 font-medium text-primary hover:bg-primary/15 hover:text-primary dark:bg-primary/15 dark:hover:bg-primary/20"
+                  )}
+                >
                   <NavLink to="/ganhos">
                     <Wallet />
                     <span>Setor de Ganhos</span>
@@ -94,13 +116,13 @@ export function AppSidebar({
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={onOpenCasas}>
+                <SidebarMenuButton onClick={onOpenCasas} className="transition-colors duration-150">
                   <Building2 />
                   <span>Gerenciar Casas</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={onOpenConfig}>
+                <SidebarMenuButton onClick={onOpenConfig} className="transition-colors duration-150">
                   <Settings />
                   <span>Configurações</span>
                 </SidebarMenuButton>
@@ -110,10 +132,10 @@ export function AppSidebar({
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border/60 p-2">
+      <SidebarFooter className="border-t border-sidebar-border p-2">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={onOpenCommand} className="text-sidebar-foreground/60">
+            <SidebarMenuButton onClick={onOpenCommand} className="text-sidebar-foreground/60 transition-colors duration-150">
               <Command />
               <span>Busca rápida</span>
               <Kbd className="ml-auto">⌘K</Kbd>
