@@ -242,6 +242,51 @@
     margin: 10mm;
   }
 
+  /* Imprime sempre com a paleta clara, mesmo se a pessoa estiver com o modo
+     escuro ligado na tela. Sem isso, o `print-color-adjust: exact` logo
+     abaixo faz o navegador imprimir literalmente as cores do tema escuro
+     (fundo quase preto, quadrados do calendário cinza-chumbo) — a folha sai
+     preta em vez de branca. Repetindo os tokens aqui, por cima da classe
+     `.dark`, garante fundo branco, quadrados em cinza claro e texto escuro
+     sempre, independente do tema em uso no momento de imprimir. */
+  :root,
+  .dark {
+    --background: #ffffff !important;
+    --foreground: #18181b !important;
+    --card: #ffffff !important;
+    --card-foreground: #18181b !important;
+    --popover: #ffffff !important;
+    --popover-foreground: #18181b !important;
+    --primary: #0d9488 !important;
+    --primary-foreground: #ffffff !important;
+    --secondary: #f4f4f5 !important;
+    --secondary-foreground: #18181b !important;
+    --muted: #f0f0f1 !important;
+    --muted-foreground: #52525b !important;
+    --accent: #ccfbf1 !important;
+    --accent-foreground: #0f766e !important;
+    --destructive: #dc2626 !important;
+    /* Bordas em cinza sólido (não translúcido) — a versão translúcida some
+       em muita impressora/leitor de PDF, e o pedido era um cinza visível
+       separando os quadrados do calendário. */
+    --border: #d4d4d8 !important;
+    --input: #d4d4d8 !important;
+    --ring: #0d9488 !important;
+    --chart-1: #0d9488 !important;
+    --chart-2: #c9992b !important;
+    --chart-3: #8b5cf6 !important;
+    --chart-4: #ec4899 !important;
+    --chart-5: #059669 !important;
+    --chart-grid: #e4e4e7 !important;
+    --gold: #c9992b !important;
+    --gold-soft: #f5e9d0 !important;
+    --gold-foreground: #5c4413 !important;
+    --airbnb: #ff385c !important;
+    --airbnb-soft: #ffe3e8 !important;
+    --booking: #003580 !important;
+    --booking-soft: #dce6f5 !important;
+  }
+
   html,
   body {
     background: #fff !important;
