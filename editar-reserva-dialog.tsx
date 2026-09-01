@@ -163,7 +163,9 @@ export function EditarReservaDialog({ reserva, comissaoMarcioPercentual, onOpenC
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor="edit-res-desconto">Desconto (R$)</FieldLabel>
+            <FieldLabel htmlFor="edit-res-desconto">
+              {plataforma === "Booking" ? "Comissão plataforma (R$)" : "Desconto (R$)"}
+            </FieldLabel>
             <Input
               id="edit-res-desconto"
               type="number"

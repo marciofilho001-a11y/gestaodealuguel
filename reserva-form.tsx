@@ -343,7 +343,9 @@ export function ReservaForm({
           />
         </Field>
         <Field>
-          <FieldLabel htmlFor="res-desconto">Desconto (R$)</FieldLabel>
+          <FieldLabel htmlFor="res-desconto">
+            {plataforma === "Booking" ? "Comissão plataforma (R$)" : "Desconto (R$)"}
+          </FieldLabel>
           <Input
             id="res-desconto"
             type="number"
