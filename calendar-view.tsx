@@ -160,8 +160,8 @@ function MonthSection({
       const dTime = d.getTime()
 
       // Faixa de conectividade: toda reserva que ocupa esse dia (do
-      // check-in ao check-out, inclusive) — desenha o fundo contínuo
-      // ligando os dias da estadia, tipo um Gantt/timeline.
+      // check-in ao check-out, inclusive) — vira uma barra fina de
+      // timeline ligando os dias da estadia, tipo um Gantt.
       const faixas = ativas
         .map((r) => ({
           r,
@@ -230,42 +230,51 @@ function MonthSection({
           <div
             key={dia.data.toISOString()}
             className={cn(
-              "relative flex min-h-32 min-w-0 flex-col rounded-2xl text-[11.5px] sm:min-h-40",
-              // Dia sem reserva ativa mantém o "card" isolado de antes. Dia
-              // dentro de uma estadia não — quem desenha o contorno ali é a
-              // própria faixa de conectividade, não a célula.
-              dia.faixas.length === 0 && "border border-border bg-card/60",
-              dia.isToday &&
-                (dia.faixas.length === 0
-                  ? "border-primary/50 bg-primary/5 ring-1 ring-primary/30"
-                  : "ring-1 ring-primary/40")
+              "relative flex min-h-32 min-w-0 flex-col rounded-2xl border border-border bg-card/60 text-[11.5px] sm:min-h-40",
+              dia.isToday && "border-primary/50 bg-primary/5 ring-1 ring-primary/30"
             )}
           >
-            {/* Faixa de conectividade contínua — um fundo colorido por
-                reserva ativa no dia, com contorno só nas pontas reais
-                (check-in/check-out) ou quebra de semana/mês. Nos dias do
-                meio a faixa "sangra" por cima do gap do grid (mesma medida
-                do gap-1.5/sm:gap-2 do grid) pra fechar sem espaço com o
-                dia vizinho. */}
+            <span
+              className={cn(
+                "px-2.5 pt-2 font-semibold",
+                dia.isToday ? "text-primary" : "text-foreground"
+              )}
+            >
+              {dia.data.getDate()}
+            </span>
+
+            {/* Timeline: uma barra fina por reserva ativa no dia, na cor da
+                reserva — nada de fundo cobrindo a célula inteira. Arredonda
+                só na ponta real (check-in/check-out) ou numa quebra de
+                semana/mês do grid; nos outros casos "sangra" por cima do gap
+                do grid (mesma medida do gap-1.5/sm:gap-2) pra emendar sem
+                espaço com o dia vizinho. */}
             {dia.faixas.length > 0 && (
-              <div className="pointer-events-none absolute inset-0 flex flex-col gap-0.5">
-                {dia.faixas.map((f) => (
-                  <div
-                    key={f.reserva.id}
-                    className={cn(
-                      "flex-1 border-t-2 border-b-2",
-                      f.arredondaEsquerda ? "rounded-l-2xl border-l-2" : "-ml-1.5 sm:-ml-2",
-                      f.arredondaDireita ? "rounded-r-2xl border-r-2" : "-mr-1.5 sm:-mr-2"
-                    )}
-                    style={{ backgroundColor: `${f.cor}1F`, borderColor: f.cor }}
-                  />
-                ))}
+              <div className="my-1 flex flex-col gap-0.5">
+                {dia.faixas.map((f) => {
+                  const nome = f.reserva.hospede || "(sem nome)"
+                  const tooltip = `${nome} — Entrada: ${formatDiaMes(f.reserva.checkin)} | Saída: ${formatDiaMes(f.reserva.checkout)}`
+                  return (
+                    <button
+                      key={f.reserva.id}
+                      type="button"
+                      title={tooltip}
+                      aria-label={tooltip}
+                      onClick={() => onSelectReserva(f.reserva.id)}
+                      className={cn(
+                        "block h-1.5 w-full shrink-0 cursor-pointer border-0 p-0 transition-[filter] duration-150 hover:brightness-110",
+                        f.reserva.id === selectedReservaId && "ring-2 ring-primary ring-offset-1 ring-offset-card",
+                        f.arredondaEsquerda ? "rounded-l-full" : "-ml-1.5 sm:-ml-2",
+                        f.arredondaDireita ? "rounded-r-full" : "-mr-1.5 sm:-mr-2"
+                      )}
+                      style={{ backgroundColor: f.cor }}
+                    />
+                  )
+                })}
               </div>
             )}
-            <div className="relative z-10 flex min-w-0 flex-1 flex-col gap-1.5 p-2">
-              <span className={cn("px-0.5 font-semibold", dia.isToday ? "text-primary" : "text-foreground")}>
-                {dia.data.getDate()}
-              </span>
+
+            <div className="flex min-w-0 flex-1 flex-col gap-1 px-2 pt-0.5 pb-2">
               {dia.checkins.length > 0 && (
                 <div className="flex flex-col gap-1">
                   {dia.checkins.slice(0, MAX_CARDS_POR_DIA).map((r) => (
