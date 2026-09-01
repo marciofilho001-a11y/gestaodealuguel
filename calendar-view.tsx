@@ -157,13 +157,50 @@ function MonthSection({
 
     const lista = Array.from({ length: totalDias }, (_, i) => {
       const d = new Date(ano, mesIdx, i + 1)
-      const checkins = ativas.filter((r) => new Date(r.checkin + "T00:00:00").getTime() === d.getTime())
-      const checkouts = ativas.filter((r) => new Date(r.checkout + "T00:00:00").getTime() === d.getTime())
-      return { data: d, isToday: d.getTime() === hoje.getTime(), checkins, checkouts }
+      const dTime = d.getTime()
+
+      // Faixa de conectividade: toda reserva que ocupa esse dia (do
+      // check-in ao check-out, inclusive) — desenha o fundo contínuo
+      // ligando os dias da estadia, tipo um Gantt/timeline.
+      const faixas = ativas
+        .map((r) => ({
+          r,
+          checkinTime: new Date(r.checkin + "T00:00:00").getTime(),
+          checkoutTime: new Date(r.checkout + "T00:00:00").getTime(),
+        }))
+        .filter(({ checkinTime, checkoutTime }) => dTime >= checkinTime && dTime <= checkoutTime)
+        // Ordem estável por id — mantém cada reserva na mesma "raia" nos
+        // dias vizinhos, senão a faixa colorida pula de posição.
+        .sort((a, b) => a.r.id - b.r.id)
+        .map(({ r, checkinTime, checkoutTime }) => {
+          const isCheckin = dTime === checkinTime
+          const isCheckout = dTime === checkoutTime
+          return {
+            reserva: r,
+            cor: modoTodasCasas
+              ? corDaCasa(casas, r.casa_id)
+              : PLATFORM_COLOR[r.plataforma] || PLATFORM_COLOR.Outro,
+            isCheckin,
+            isCheckout,
+            // Arredonda (e ganha borda lateral) só nas pontas de verdade
+            // (check-in/check-out) ou nas quebras de linha/mês do grid —
+            // ali a faixa "fecha" e reabre na linha ou no mês seguinte,
+            // mesmo sem ser o check-in/check-out real da reserva.
+            arredondaEsquerda: isCheckin || d.getDay() === 0 || i === 0,
+            arredondaDireita: isCheckout || d.getDay() === 6 || i === totalDias - 1,
+          }
+        })
+
+      // Cartão de check-in e aviso de check-out são só um recorte das
+      // faixas do dia — evita repetir a lógica de parse de data.
+      const checkins = faixas.filter((f) => f.isCheckin).map((f) => f.reserva)
+      const checkouts = faixas.filter((f) => f.isCheckout).map((f) => f.reserva)
+
+      return { data: d, isToday: dTime === hoje.getTime(), checkins, checkouts, faixas }
     })
 
     return { dias: lista, primeiroDiaSemana: primeiro }
-  }, [mes, reservasCasa, hoje])
+  }, [mes, reservasCasa, hoje, casas, modoTodasCasas])
 
   const nomeMes = mes.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
   const totalCelulas = primeiroDiaSemana + dias.length
@@ -193,49 +230,79 @@ function MonthSection({
           <div
             key={dia.data.toISOString()}
             className={cn(
-              "flex min-h-32 min-w-0 flex-col gap-1.5 rounded-2xl border border-border bg-card/60 p-2 text-[11.5px] sm:min-h-40",
-              dia.isToday && "border-primary/50 bg-primary/5 ring-1 ring-primary/30"
+              "relative flex min-h-32 min-w-0 flex-col rounded-2xl text-[11.5px] sm:min-h-40",
+              // Dia sem reserva ativa mantém o "card" isolado de antes. Dia
+              // dentro de uma estadia não — quem desenha o contorno ali é a
+              // própria faixa de conectividade, não a célula.
+              dia.faixas.length === 0 && "border border-border bg-card/60",
+              dia.isToday &&
+                (dia.faixas.length === 0
+                  ? "border-primary/50 bg-primary/5 ring-1 ring-primary/30"
+                  : "ring-1 ring-primary/40")
             )}
           >
-            <span className={cn("px-0.5 font-semibold", dia.isToday ? "text-primary" : "text-foreground")}>
-              {dia.data.getDate()}
-            </span>
-            {dia.checkins.length > 0 && (
-              <div className="flex flex-col gap-1">
-                {dia.checkins.slice(0, MAX_CARDS_POR_DIA).map((r) => (
-                  <ReservaDayCard
-                    key={r.id}
-                    reserva={r}
-                    casas={casas}
-                    modoTodasCasas={modoTodasCasas}
-                    selected={r.id === selectedReservaId}
-                    onSelect={() => onSelectReserva(r.id)}
+            {/* Faixa de conectividade contínua — um fundo colorido por
+                reserva ativa no dia, com contorno só nas pontas reais
+                (check-in/check-out) ou quebra de semana/mês. Nos dias do
+                meio a faixa "sangra" por cima do gap do grid (mesma medida
+                do gap-1.5/sm:gap-2 do grid) pra fechar sem espaço com o
+                dia vizinho. */}
+            {dia.faixas.length > 0 && (
+              <div className="pointer-events-none absolute inset-0 flex flex-col gap-0.5">
+                {dia.faixas.map((f) => (
+                  <div
+                    key={f.reserva.id}
+                    className={cn(
+                      "flex-1 border-t-2 border-b-2",
+                      f.arredondaEsquerda ? "rounded-l-2xl border-l-2" : "-ml-1.5 sm:-ml-2",
+                      f.arredondaDireita ? "rounded-r-2xl border-r-2" : "-mr-1.5 sm:-mr-2"
+                    )}
+                    style={{ backgroundColor: `${f.cor}1F`, borderColor: f.cor }}
                   />
                 ))}
-                {dia.checkins.length > MAX_CARDS_POR_DIA && (
-                  <span className="px-1 text-[10px] text-muted-foreground">
-                    +{dia.checkins.length - MAX_CARDS_POR_DIA} mais
-                  </span>
-                )}
               </div>
             )}
-            {dia.checkouts.length > 0 && (
-              <div className="flex flex-col gap-1">
-                {dia.checkouts.slice(0, MAX_SAIDAS_POR_DIA).map((r) => (
-                  <CheckoutBadge
-                    key={`checkout-${r.id}`}
-                    reserva={r}
-                    selected={r.id === selectedReservaId}
-                    onSelect={() => onSelectReserva(r.id)}
-                  />
-                ))}
-                {dia.checkouts.length > MAX_SAIDAS_POR_DIA && (
-                  <span className="px-1 text-[10px] text-muted-foreground">
-                    +{dia.checkouts.length - MAX_SAIDAS_POR_DIA} saídas
-                  </span>
-                )}
-              </div>
-            )}
+            <div className="relative z-10 flex min-w-0 flex-1 flex-col gap-1.5 p-2">
+              <span className={cn("px-0.5 font-semibold", dia.isToday ? "text-primary" : "text-foreground")}>
+                {dia.data.getDate()}
+              </span>
+              {dia.checkins.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  {dia.checkins.slice(0, MAX_CARDS_POR_DIA).map((r) => (
+                    <ReservaDayCard
+                      key={r.id}
+                      reserva={r}
+                      casas={casas}
+                      modoTodasCasas={modoTodasCasas}
+                      selected={r.id === selectedReservaId}
+                      onSelect={() => onSelectReserva(r.id)}
+                    />
+                  ))}
+                  {dia.checkins.length > MAX_CARDS_POR_DIA && (
+                    <span className="px-1 text-[10px] text-muted-foreground">
+                      +{dia.checkins.length - MAX_CARDS_POR_DIA} mais
+                    </span>
+                  )}
+                </div>
+              )}
+              {dia.checkouts.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  {dia.checkouts.slice(0, MAX_SAIDAS_POR_DIA).map((r) => (
+                    <CheckoutBadge
+                      key={`checkout-${r.id}`}
+                      reserva={r}
+                      selected={r.id === selectedReservaId}
+                      onSelect={() => onSelectReserva(r.id)}
+                    />
+                  ))}
+                  {dia.checkouts.length > MAX_SAIDAS_POR_DIA && (
+                    <span className="px-1 text-[10px] text-muted-foreground">
+                      +{dia.checkouts.length - MAX_SAIDAS_POR_DIA} saídas
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         ))}
         {Array.from({ length: trailing }, (_, i) => (
