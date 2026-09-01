@@ -2,7 +2,7 @@ import * as React from "react"
 import { Area, AreaChart } from "recharts"
 
 import { SpotlightCard } from "@/components/spotlight-card"
-import { formatBRL } from "@/lib/format"
+import { comissaoPlataformaEfetiva, formatBRL, valorBrutoEfetivo } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { Reserva } from "@/types"
 
@@ -95,11 +95,14 @@ export function SummaryCards({ reservasCasa, mesAtual }: SummaryCardsProps) {
     const doMes = ativas.filter((r) => overlap(r, inicioMes, fimMes))
     const daSemana = ativas.filter((r) => overlap(r, inicioSemana, fimSemana))
 
-    const totalMes = doMes.reduce((s, r) => s + (Number(r.valor_total) || 0), 0)
-    const totalSemana = daSemana.reduce((s, r) => s + (Number(r.valor_total) || 0), 0)
-    const somaDescontos = doMes.reduce((s, r) => s + (Number(r.desconto) || 0), 0)
+    const totalMes = doMes.reduce((s, r) => s + valorBrutoEfetivo(r), 0)
+    const totalSemana = daSemana.reduce((s, r) => s + valorBrutoEfetivo(r), 0)
+    // Desconto de hóspede de verdade — exclui Booking, onde esse mesmo campo
+    // já virou "Comissão plataforma" (contado abaixo em somaComissao). Sem
+    // isso o mesmo real apareceria duas vezes, em dois cards diferentes.
+    const somaDescontos = doMes.reduce((s, r) => s + (r.plataforma === "Booking" ? 0 : Number(r.desconto) || 0), 0)
     const somaLimpeza = doMes.reduce((s, r) => s + (Number(r.taxa_limpeza) || 0), 0)
-    const somaComissao = doMes.reduce((s, r) => s + (Number(r.comissao_plataforma) || 0), 0)
+    const somaComissao = doMes.reduce((s, r) => s + comissaoPlataformaEfetiva(r), 0)
     const receitaLiquida = totalMes - somaComissao
     const mediaDiaria = doMes.length ? doMes.reduce((s, r) => s + (Number(r.valor_diaria) || 0), 0) / doMes.length : 0
 

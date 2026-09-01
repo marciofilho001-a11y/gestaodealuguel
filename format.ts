@@ -1,5 +1,32 @@
 // Utilitários de formatação — portados 1:1 da lógica original do index.html
 
+import type { Reserva } from "@/types"
+
+// A "Comissão plataforma" do Booking não vive na coluna comissao_plataforma
+// (essa ficou congelada em 0 desde que o campo saiu do formulário — ver
+// CLAUDE.md) — o formulário reaproveita o campo `desconto` pra isso (rótulo
+// muda pra "Comissão plataforma (R$)" quando a reserva é do Booking, ver
+// reserva-form.tsx). Pra Airbnb/Outro, `desconto` continua sendo desconto
+// de hóspede de verdade, e a comissão (se houver) é a antiga
+// comissao_plataforma. Essas duas funções são o único lugar que sabe disso
+// — todo relatório de ganhos (Setor de Ganhos, resumo do dashboard, painel
+// de detalhamento) deve ler a comissão e o bruto através delas, nunca dos
+// campos crus, senão a comissão do Booking some da conta.
+export function comissaoPlataformaEfetiva(r: Reserva): number {
+  if (r.plataforma === "Booking") return Number(r.desconto) || 0
+  return Number(r.comissao_plataforma) || 0
+}
+
+// valor_total já sai do banco com essa comissão subtraída na criação
+// (valor_total = diárias + limpeza − desconto, ver use-aluguel-data.tsx) —
+// pra um "bruto" de verdade, comparável entre plataformas, soma de volta
+// só a parte do Booking. Airbnb/Outro não mudam (desconto ali é desconto
+// mesmo, já é pra ficar dentro do bruto).
+export function valorBrutoEfetivo(r: Reserva): number {
+  const base = Number(r.valor_total) || 0
+  return r.plataforma === "Booking" ? base + (Number(r.desconto) || 0) : base
+}
+
 export function formatBRL(v: number | null | undefined): string {
   return "R$ " + (v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }

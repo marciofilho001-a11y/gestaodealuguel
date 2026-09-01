@@ -10,7 +10,7 @@ import {
 import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { PlatformIcon } from "@/components/platform-icon"
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { formatBRL, formatDate } from "@/lib/format"
+import { comissaoPlataformaEfetiva, formatBRL, formatDate, valorBrutoEfetivo } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { Casa, Reserva } from "@/types"
 
@@ -57,8 +57,8 @@ export function ReservasDrilldownDialog({
   const ordenadas = [...reservas].sort((a, b) => a.checkin.localeCompare(b.checkin))
   const totais = ordenadas.reduce(
     (acc, r) => ({
-      bruto: acc.bruto + (Number(r.valor_total) || 0),
-      comissao: acc.comissao + (Number(r.comissao_plataforma) || 0),
+      bruto: acc.bruto + valorBrutoEfetivo(r),
+      comissao: acc.comissao + comissaoPlataformaEfetiva(r),
       marcio: acc.marcio + (Number(r.comissao_marcio) || 0),
     }),
     { bruto: 0, comissao: 0, marcio: 0 }
@@ -116,9 +116,11 @@ export function ReservasDrilldownDialog({
                       <TableCell className={td}>{r.hospede || "(sem nome)"}</TableCell>
                       <TableCell className={cn(td, "font-mono text-xs")}>{formatDate(r.checkin)}</TableCell>
                       <TableCell className={cn(td, "font-mono text-xs")}>{formatDate(r.checkout)}</TableCell>
-                      <TableCell className={cn(td, "text-right font-mono tabular-nums")}>{formatBRL(r.valor_total)}</TableCell>
                       <TableCell className={cn(td, "text-right font-mono tabular-nums")}>
-                        {formatBRL(r.comissao_plataforma)}
+                        {formatBRL(valorBrutoEfetivo(r))}
+                      </TableCell>
+                      <TableCell className={cn(td, "text-right font-mono tabular-nums")}>
+                        {formatBRL(comissaoPlataformaEfetiva(r))}
                       </TableCell>
                       <TableCell className={cn(td, "text-right font-mono tabular-nums")}>{formatBRL(r.comissao_marcio)}</TableCell>
                     </TableRow>
@@ -159,11 +161,11 @@ export function ReservasDrilldownDialog({
                   <div className="grid grid-cols-3 gap-2 border-t border-border pt-2 text-xs">
                     <div>
                       <div className="text-muted-foreground">Total</div>
-                      <div className="font-mono font-semibold tabular-nums">{formatBRL(r.valor_total)}</div>
+                      <div className="font-mono font-semibold tabular-nums">{formatBRL(valorBrutoEfetivo(r))}</div>
                     </div>
                     <div>
                       <div className="text-muted-foreground">Comissão</div>
-                      <div className="font-mono tabular-nums">{formatBRL(r.comissao_plataforma)}</div>
+                      <div className="font-mono tabular-nums">{formatBRL(comissaoPlataformaEfetiva(r))}</div>
                     </div>
                     <div>
                       <div className="text-muted-foreground">Marcio</div>

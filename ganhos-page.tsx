@@ -16,7 +16,7 @@ import { ReservasDrilldownDialog } from "@/components/reservas-drilldown-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SpotlightCard, SpotlightOverlay } from "@/components/spotlight-card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { formatBRL, primeiroDiaMes, ultimoDiaMes } from "@/lib/format"
+import { comissaoPlataformaEfetiva, formatBRL, primeiroDiaMes, ultimoDiaMes, valorBrutoEfetivo } from "@/lib/format"
 import { PLATFORM_BADGE, PLATFORM_COLOR } from "@/lib/platform"
 import { cn } from "@/lib/utils"
 import type { CasaSelecionada } from "@/hooks/use-aluguel-data"
@@ -162,10 +162,13 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
     if (de) filtradas = filtradas.filter((r) => r.checkout > de)
     if (ate) filtradas = filtradas.filter((r) => r.checkin <= ate)
 
-    const valorBruto = filtradas.reduce((s, r) => s + (Number(r.valor_total) || 0), 0)
-    const comissaoTotal = filtradas.reduce((s, r) => s + (Number(r.comissao_plataforma) || 0), 0)
+    const valorBruto = filtradas.reduce((s, r) => s + valorBrutoEfetivo(r), 0)
+    const comissaoTotal = filtradas.reduce((s, r) => s + comissaoPlataformaEfetiva(r), 0)
     const comissaoMarcioTotal = filtradas.reduce((s, r) => s + (Number(r.comissao_marcio) || 0), 0)
-    const descontoTotal = filtradas.reduce((s, r) => s + (Number(r.desconto) || 0), 0)
+    // Desconto de hóspede de verdade — exclui Booking, onde esse mesmo campo
+    // já virou "Comissão plataforma" (contado acima em comissaoTotal). Sem
+    // isso o mesmo real apareceria duas vezes, em dois cards diferentes.
+    const descontoTotal = filtradas.reduce((s, r) => s + (r.plataforma === "Booking" ? 0 : Number(r.desconto) || 0), 0)
     const limpezaTotal = filtradas.reduce((s, r) => s + (Number(r.taxa_limpeza) || 0), 0)
     const valorLiquido = valorBruto - comissaoTotal - comissaoMarcioTotal
     const totalReservas = filtradas.length
@@ -174,8 +177,8 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
     filtradas.forEach((r) => {
       const p = r.plataforma || "Outro"
       if (!porPlataforma[p]) porPlataforma[p] = { bruto: 0, comissao: 0, comissaoMarcio: 0, qtd: 0 }
-      porPlataforma[p].bruto += Number(r.valor_total) || 0
-      porPlataforma[p].comissao += Number(r.comissao_plataforma) || 0
+      porPlataforma[p].bruto += valorBrutoEfetivo(r)
+      porPlataforma[p].comissao += comissaoPlataformaEfetiva(r)
       porPlataforma[p].comissaoMarcio += Number(r.comissao_marcio) || 0
       porPlataforma[p].qtd += 1
     })
@@ -194,8 +197,8 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
       filtradas.forEach((r) => {
         const cid = r.casa_id ?? 0
         if (!acumulado[cid]) acumulado[cid] = { bruto: 0, comissao: 0, comissaoMarcio: 0, qtd: 0 }
-        acumulado[cid].bruto += Number(r.valor_total) || 0
-        acumulado[cid].comissao += Number(r.comissao_plataforma) || 0
+        acumulado[cid].bruto += valorBrutoEfetivo(r)
+        acumulado[cid].comissao += comissaoPlataformaEfetiva(r)
         acumulado[cid].comissaoMarcio += Number(r.comissao_marcio) || 0
         acumulado[cid].qtd += 1
       })
