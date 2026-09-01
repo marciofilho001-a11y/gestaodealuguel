@@ -1,8 +1,6 @@
 import * as React from "react"
 import { motion } from "framer-motion"
-import { DoorOpen } from "lucide-react"
 
-import { GuestAvatar } from "@/components/guest-avatar"
 import { corDaCasa } from "@/lib/colors"
 import { abreviarNome, formatBRLCompacto, formatDiaMes } from "@/lib/format"
 import { PLATFORM_COLOR } from "@/lib/platform"
@@ -47,43 +45,34 @@ interface ReservaDayCardProps {
   onSelect: () => void
 }
 
+// Único lugar da UI onde a cor da casa/plataforma ainda aparece: uma faixa
+// fina na lateral esquerda do card, não mais barras cobrindo o topo do dia
+// nem o avatar inteiro tingido — a cor vira um indicador pequeno, não o
+// elemento dominante do card.
 function ReservaDayCard({ reserva, casas, modoTodasCasas, selected, onSelect }: ReservaDayCardProps) {
   const cor = modoTodasCasas
     ? corDaCasa(casas, reserva.casa_id)
     : PLATFORM_COLOR[reserva.plataforma] || PLATFORM_COLOR.Outro
 
-  // O dia do check-in já é a própria posição do card no grid — repetir a
-  // data de chegada aqui dentro seria redundante. Só a saída importa.
   const nomeAbreviado = abreviarNome(reserva.hospede) || "(sem nome)"
 
   return (
     <motion.button
       type="button"
       onClick={onSelect}
-      whileHover={{ y: -2 }}
+      whileHover={{ y: -1 }}
       transition={{ duration: 0.15 }}
       className={cn(
-        "flex w-full min-w-0 flex-col items-start gap-0.5 rounded-lg border p-2 text-left leading-tight shadow-none transition-[background-color,border-color,box-shadow] hover:shadow-sm",
-        selected
-          ? "border-primary bg-primary/10 ring-1 ring-primary"
-          : "border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100/70 dark:border-border dark:bg-card dark:text-foreground dark:hover:bg-accent/40"
+        "flex w-full min-w-0 flex-col items-start gap-0.5 rounded-lg border border-l-[3px] bg-card py-1 pr-2 pl-2 text-left leading-tight shadow-none transition-colors",
+        selected ? "border-primary/50 bg-primary/5 ring-1 ring-primary/30" : "border-border hover:bg-muted/60"
       )}
+      style={{ borderLeftColor: cor }}
     >
-      <div className="flex w-full min-w-0 items-center gap-1.5">
-        <GuestAvatar
-          nome={reserva.hospede || "?"}
-          casas={casas}
-          casaId={reserva.casa_id}
-          cor={cor}
-          size="sm"
-          className="size-5 shrink-0"
-        />
-        <span className="min-w-0 flex-1 truncate text-[11px] leading-tight font-semibold">{nomeAbreviado}</span>
-      </div>
-      <span className="w-full min-w-0 truncate font-mono text-[11px] leading-tight tabular-nums text-emerald-700/80 dark:text-muted-foreground">
-        → {formatDiaMes(reserva.checkout)}
+      <span className="w-full min-w-0 truncate text-[11.5px] font-semibold text-foreground">{nomeAbreviado}</span>
+      <span className="w-full min-w-0 truncate font-mono text-[10px] leading-tight tabular-nums text-muted-foreground">
+        {formatDiaMes(reserva.checkin)} → {formatDiaMes(reserva.checkout)}
       </span>
-      <span className="w-full min-w-0 truncate font-mono text-[11px] leading-tight font-bold tabular-nums text-emerald-800 dark:text-emerald-400">
+      <span className="w-full min-w-0 truncate font-mono text-[10px] leading-tight tabular-nums text-muted-foreground/75">
         {formatBRLCompacto(reserva.valor_total)}
       </span>
     </motion.button>
@@ -96,27 +85,26 @@ interface CheckoutBadgeProps {
   onSelect: () => void
 }
 
-// Aviso compacto de saída — deliberadamente menor e mais discreto que o
-// card de check-in, só pra sinalizar "casa libera hoje" de relance.
+// Uma linha discreta, não mais um card vermelho — o vermelho aqui é só um
+// tom de texto suave, pra sinalizar "casa libera hoje" sem competir com os
+// cards de check-in.
 function CheckoutBadge({ reserva, selected, onSelect }: CheckoutBadgeProps) {
   return (
-    <motion.button
+    <button
       type="button"
       onClick={onSelect}
-      whileHover={{ y: -2 }}
-      transition={{ duration: 0.15 }}
       className={cn(
-        "flex w-full min-w-0 items-center gap-1 rounded-md border p-1.5 text-left leading-tight transition-[background-color,border-color,box-shadow] hover:shadow-sm",
-        selected
-          ? "border-rose-400 bg-rose-100 text-rose-900 ring-1 ring-rose-400 dark:border-destructive dark:bg-destructive/15 dark:text-destructive dark:ring-destructive"
-          : "border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100/70 dark:border-destructive/25 dark:bg-destructive/5 dark:text-destructive/80 dark:hover:bg-destructive/10"
+        "flex w-full min-w-0 items-baseline gap-1 rounded-md px-1.5 py-0.5 text-left transition-colors",
+        selected ? "bg-destructive/10 text-destructive" : "text-destructive/65 hover:bg-destructive/5"
       )}
     >
-      <DoorOpen className="size-3 shrink-0" />
-      <span className="min-w-0 flex-1 truncate text-[11px] leading-tight font-medium">
-        Saída: {abreviarNome(reserva.hospede) || "(sem nome)"}
+      <span aria-hidden="true" className="text-[10px] leading-none">
+        ←
       </span>
-    </motion.button>
+      <span className="min-w-0 flex-1 truncate text-[10.5px] leading-tight font-medium">
+        Saída · {abreviarNome(reserva.hospede) || "(sem nome)"}
+      </span>
+    </button>
   )
 }
 
@@ -157,50 +145,13 @@ function MonthSection({
 
     const lista = Array.from({ length: totalDias }, (_, i) => {
       const d = new Date(ano, mesIdx, i + 1)
-      const dTime = d.getTime()
-
-      // Faixa de conectividade: toda reserva que ocupa esse dia (do
-      // check-in ao check-out, inclusive) — vira uma barra fina de
-      // timeline ligando os dias da estadia, tipo um Gantt.
-      const faixas = ativas
-        .map((r) => ({
-          r,
-          checkinTime: new Date(r.checkin + "T00:00:00").getTime(),
-          checkoutTime: new Date(r.checkout + "T00:00:00").getTime(),
-        }))
-        .filter(({ checkinTime, checkoutTime }) => dTime >= checkinTime && dTime <= checkoutTime)
-        // Ordem estável por id — mantém cada reserva na mesma "raia" nos
-        // dias vizinhos, senão a faixa colorida pula de posição.
-        .sort((a, b) => a.r.id - b.r.id)
-        .map(({ r, checkinTime, checkoutTime }) => {
-          const isCheckin = dTime === checkinTime
-          const isCheckout = dTime === checkoutTime
-          return {
-            reserva: r,
-            cor: modoTodasCasas
-              ? corDaCasa(casas, r.casa_id)
-              : PLATFORM_COLOR[r.plataforma] || PLATFORM_COLOR.Outro,
-            isCheckin,
-            isCheckout,
-            // Arredonda (e ganha borda lateral) só nas pontas de verdade
-            // (check-in/check-out) ou nas quebras de linha/mês do grid —
-            // ali a faixa "fecha" e reabre na linha ou no mês seguinte,
-            // mesmo sem ser o check-in/check-out real da reserva.
-            arredondaEsquerda: isCheckin || d.getDay() === 0 || i === 0,
-            arredondaDireita: isCheckout || d.getDay() === 6 || i === totalDias - 1,
-          }
-        })
-
-      // Cartão de check-in e aviso de check-out são só um recorte das
-      // faixas do dia — evita repetir a lógica de parse de data.
-      const checkins = faixas.filter((f) => f.isCheckin).map((f) => f.reserva)
-      const checkouts = faixas.filter((f) => f.isCheckout).map((f) => f.reserva)
-
-      return { data: d, isToday: dTime === hoje.getTime(), checkins, checkouts, faixas }
+      const checkins = ativas.filter((r) => new Date(r.checkin + "T00:00:00").getTime() === d.getTime())
+      const checkouts = ativas.filter((r) => new Date(r.checkout + "T00:00:00").getTime() === d.getTime())
+      return { data: d, isToday: d.getTime() === hoje.getTime(), checkins, checkouts }
     })
 
     return { dias: lista, primeiroDiaSemana: primeiro }
-  }, [mes, reservasCasa, hoje, casas, modoTodasCasas])
+  }, [mes, reservasCasa, hoje])
 
   const nomeMes = mes.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
   const totalCelulas = primeiroDiaSemana + dias.length
@@ -230,88 +181,49 @@ function MonthSection({
           <div
             key={dia.data.toISOString()}
             className={cn(
-              "relative flex min-h-32 min-w-0 flex-col rounded-2xl border border-border bg-card/60 text-[11.5px] sm:min-h-40",
-              dia.isToday && "border-primary/50 bg-primary/5 ring-1 ring-primary/30"
+              "flex min-h-24 min-w-0 flex-col gap-1 rounded-xl border border-border/60 bg-muted/40 p-1.5 text-[11.5px] sm:min-h-28",
+              dia.isToday && "border-primary/40 bg-primary/5 ring-1 ring-primary/25"
             )}
           >
-            <span
-              className={cn(
-                "px-2.5 pt-2 font-semibold",
-                dia.isToday ? "text-primary" : "text-foreground"
-              )}
-            >
+            <span className={cn("px-0.5 text-[12px] font-bold", dia.isToday ? "text-primary" : "text-foreground")}>
               {dia.data.getDate()}
             </span>
-
-            {/* Timeline: uma barra fina por reserva ativa no dia, na cor da
-                reserva — nada de fundo cobrindo a célula inteira. Arredonda
-                só na ponta real (check-in/check-out) ou numa quebra de
-                semana/mês do grid; nos outros casos "sangra" por cima do gap
-                do grid (mesma medida do gap-1.5/sm:gap-2) pra emendar sem
-                espaço com o dia vizinho. */}
-            {dia.faixas.length > 0 && (
-              <div className="my-1 flex flex-col gap-0.5">
-                {dia.faixas.map((f) => {
-                  const nome = f.reserva.hospede || "(sem nome)"
-                  const tooltip = `${nome} — Entrada: ${formatDiaMes(f.reserva.checkin)} | Saída: ${formatDiaMes(f.reserva.checkout)}`
-                  return (
-                    <button
-                      key={f.reserva.id}
-                      type="button"
-                      title={tooltip}
-                      aria-label={tooltip}
-                      onClick={() => onSelectReserva(f.reserva.id)}
-                      className={cn(
-                        "block h-1.5 w-full shrink-0 cursor-pointer border-0 p-0 transition-[filter] duration-150 hover:brightness-110",
-                        f.reserva.id === selectedReservaId && "ring-2 ring-primary ring-offset-1 ring-offset-card",
-                        f.arredondaEsquerda ? "rounded-l-full" : "-ml-1.5 sm:-ml-2",
-                        f.arredondaDireita ? "rounded-r-full" : "-mr-1.5 sm:-mr-2"
-                      )}
-                      style={{ backgroundColor: f.cor }}
-                    />
-                  )
-                })}
+            {dia.checkins.length > 0 && (
+              <div className="flex flex-col gap-1">
+                {dia.checkins.slice(0, MAX_CARDS_POR_DIA).map((r) => (
+                  <ReservaDayCard
+                    key={r.id}
+                    reserva={r}
+                    casas={casas}
+                    modoTodasCasas={modoTodasCasas}
+                    selected={r.id === selectedReservaId}
+                    onSelect={() => onSelectReserva(r.id)}
+                  />
+                ))}
+                {dia.checkins.length > MAX_CARDS_POR_DIA && (
+                  <span className="px-1 text-[10px] text-muted-foreground">
+                    +{dia.checkins.length - MAX_CARDS_POR_DIA} mais
+                  </span>
+                )}
               </div>
             )}
-
-            <div className="flex min-w-0 flex-1 flex-col gap-1 px-2 pt-0.5 pb-2">
-              {dia.checkins.length > 0 && (
-                <div className="flex flex-col gap-1">
-                  {dia.checkins.slice(0, MAX_CARDS_POR_DIA).map((r) => (
-                    <ReservaDayCard
-                      key={r.id}
-                      reserva={r}
-                      casas={casas}
-                      modoTodasCasas={modoTodasCasas}
-                      selected={r.id === selectedReservaId}
-                      onSelect={() => onSelectReserva(r.id)}
-                    />
-                  ))}
-                  {dia.checkins.length > MAX_CARDS_POR_DIA && (
-                    <span className="px-1 text-[10px] text-muted-foreground">
-                      +{dia.checkins.length - MAX_CARDS_POR_DIA} mais
-                    </span>
-                  )}
-                </div>
-              )}
-              {dia.checkouts.length > 0 && (
-                <div className="flex flex-col gap-1">
-                  {dia.checkouts.slice(0, MAX_SAIDAS_POR_DIA).map((r) => (
-                    <CheckoutBadge
-                      key={`checkout-${r.id}`}
-                      reserva={r}
-                      selected={r.id === selectedReservaId}
-                      onSelect={() => onSelectReserva(r.id)}
-                    />
-                  ))}
-                  {dia.checkouts.length > MAX_SAIDAS_POR_DIA && (
-                    <span className="px-1 text-[10px] text-muted-foreground">
-                      +{dia.checkouts.length - MAX_SAIDAS_POR_DIA} saídas
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
+            {dia.checkouts.length > 0 && (
+              <div className="flex flex-col gap-0.5">
+                {dia.checkouts.slice(0, MAX_SAIDAS_POR_DIA).map((r) => (
+                  <CheckoutBadge
+                    key={`checkout-${r.id}`}
+                    reserva={r}
+                    selected={r.id === selectedReservaId}
+                    onSelect={() => onSelectReserva(r.id)}
+                  />
+                ))}
+                {dia.checkouts.length > MAX_SAIDAS_POR_DIA && (
+                  <span className="px-1 text-[10px] text-muted-foreground">
+                    +{dia.checkouts.length - MAX_SAIDAS_POR_DIA} saídas
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         ))}
         {Array.from({ length: trailing }, (_, i) => (
@@ -504,8 +416,8 @@ export const CalendarView = React.forwardRef<CalendarViewHandle, CalendarViewPro
                 {p}
               </span>
             ))}
-        <span className="flex items-center gap-1.5 text-rose-700 dark:text-destructive/80">
-          <DoorOpen className="size-3" />
+        <span className="flex items-center gap-1.5">
+          <span className="size-2 rounded-full bg-destructive/60" />
           Saída (check-out)
         </span>
       </div>

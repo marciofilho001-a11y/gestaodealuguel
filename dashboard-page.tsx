@@ -131,17 +131,17 @@ export function DashboardPage({ data, onOpenCasas, onEditReserva, hojeSignal, on
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/85 px-4 py-2.5 backdrop-blur">
         <SidebarTrigger />
         <ButtonGroup>
-          <Button variant="outline" size="icon" className="size-7" onClick={() => handleMudarMes(-1)}>
+          <Button variant="ghost" size="icon" className="size-7 text-muted-foreground" onClick={() => handleMudarMes(-1)}>
             <ChevronLeft className="size-4" />
           </Button>
-          <ButtonGroupText className="h-7 min-w-32 justify-center border-transparent bg-transparent capitalize">
+          <ButtonGroupText className="h-7 min-w-32 justify-center border-transparent bg-transparent text-base font-bold tracking-tight capitalize">
             {nomeMes}
           </ButtonGroupText>
-          <Button variant="outline" size="icon" className="size-7" onClick={() => handleMudarMes(1)}>
+          <Button variant="ghost" size="icon" className="size-7 text-muted-foreground" onClick={() => handleMudarMes(1)}>
             <ChevronRight className="size-4" />
           </Button>
         </ButtonGroup>
-        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onHoje}>
+        <Button variant="outline" size="sm" className="h-7 rounded-full text-xs" onClick={onHoje}>
           Hoje
         </Button>
         <Button variant="outline" size="icon" className="size-7" onClick={handleAbrirAlertas}>
