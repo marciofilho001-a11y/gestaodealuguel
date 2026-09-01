@@ -1,6 +1,13 @@
 import * as React from "react"
 import { motion } from "framer-motion"
 
+import {
+  calcularEstatisticasImpressao,
+  PrintReportFooter,
+  PrintReportHeader,
+  PrintReportLegend,
+  PrintReportSummary,
+} from "@/components/calendar-print-report"
 import { corDaCasa } from "@/lib/colors"
 import { abreviarNome, formatBRLCompacto, formatDiaMes } from "@/lib/format"
 import { PLATFORM_COLOR } from "@/lib/platform"
@@ -63,13 +70,24 @@ function ReservaDayCard({ reserva, casas, modoTodasCasas, selected, onSelect }: 
       whileHover={{ y: -1 }}
       transition={{ duration: 0.15 }}
       className={cn(
-        "flex w-full min-w-0 flex-col items-start gap-0.5 rounded-lg border border-l-[3px] bg-card py-1 pr-2 pl-2 text-left leading-tight shadow-none transition-colors print:gap-0 print:rounded-md print:py-0.5",
+        "flex w-full min-w-0 flex-col items-start gap-0.5 rounded-lg border border-l-[3px] bg-card py-1 pr-2 pl-2 text-left leading-tight shadow-none transition-colors print:gap-0 print:rounded-md print:border-zinc-200 print:py-0.5",
         selected ? "border-primary/50 bg-primary/5 ring-1 ring-primary/30" : "border-border hover:bg-muted/60"
       )}
       style={{ borderLeftColor: cor }}
     >
-      <span className="w-full min-w-0 truncate text-[11.5px] font-semibold text-foreground print:text-[8px]">
-        {nomeAbreviado}
+      <span className="flex w-full min-w-0 items-center gap-1">
+        {/* Na tela a cor já está na faixa lateral do card — repetir num
+            ponto some seria redundante. No papel a faixa fica sutil demais
+            (impressora não reproduz bem 3px de cor), então a bolinha antes
+            do nome garante que a cor da casa/plataforma continue lisível. */}
+        <span
+          aria-hidden="true"
+          className="hidden size-[5px] shrink-0 rounded-full print:inline-block"
+          style={{ backgroundColor: cor }}
+        />
+        <span className="min-w-0 flex-1 truncate text-[11.5px] font-semibold text-foreground print:text-[7.5px]">
+          {nomeAbreviado}
+        </span>
       </span>
       <span className="w-full min-w-0 truncate font-mono text-[10px] leading-tight tabular-nums text-muted-foreground print:text-[7px]">
         {formatDiaMes(reserva.checkin)} → {formatDiaMes(reserva.checkout)}
@@ -121,6 +139,9 @@ interface MonthSectionProps {
   /** Único mês que sobrevive na impressão — os demais somem via `print:hidden`
    *  (o feed continua rolando normalmente na tela, só o papel filtra). */
   ativoNaImpressao: boolean
+  /** "Nome da unidade" que aparece no cabeçalho do papel — nome da casa
+   *  selecionada, ou "Todas as casas" no modo agregado. */
+  nomeUnidadeImpressao: string
 }
 
 function MonthSection({
@@ -132,6 +153,7 @@ function MonthSection({
   selectedReservaId,
   onSelectReserva,
   ativoNaImpressao,
+  nomeUnidadeImpressao,
 }: MonthSectionProps) {
   const key = monthKey(mes)
 
@@ -163,6 +185,14 @@ function MonthSection({
   const totalCelulas = primeiroDiaSemana + dias.length
   const trailing = (7 - (totalCelulas % 7)) % 7
 
+  // Só vale a pena somar reservas x 30 dias pros meses que vão realmente
+  // sair no papel — o feed pode ter dezenas de meses montados ao mesmo
+  // tempo (rolagem infinita), e o resto nem chega a aparecer na tela.
+  const statsImpressao = React.useMemo(
+    () => (ativoNaImpressao ? calcularEstatisticasImpressao(mes, reservasCasa) : null),
+    [ativoNaImpressao, mes, reservasCasa]
+  )
+
   return (
     <section
       ref={sectionRef}
@@ -173,92 +203,116 @@ function MonthSection({
         ativoNaImpressao && "print:flex print:h-[190mm] print:flex-col"
       )}
     >
-      <div className="mb-3 px-0.5 print:mb-2 print:shrink-0">
+      {ativoNaImpressao && statsImpressao && (
+        <>
+          <PrintReportHeader mes={mes} nomeUnidade={nomeUnidadeImpressao} />
+          <PrintReportSummary stats={statsImpressao} />
+        </>
+      )}
+
+      <div className="mb-3 px-0.5 print:hidden">
         <div className="flex items-baseline gap-2.5">
-          <h2 className="text-2xl font-bold tracking-tight text-foreground capitalize print:text-3xl">{nomeMes}</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground capitalize">{nomeMes}</h2>
           {ehMesAtual && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary print:hidden">
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
               <span className="size-1.5 rounded-full bg-primary" />
               mês atual
             </span>
           )}
         </div>
-        {/* Só aparece no papel — na tela o mês já está óbvio pelo rótulo do
-            cabeçalho fixo, não precisa repetir a marca aqui. */}
-        <p className="hidden text-[10px] font-medium tracking-wide text-muted-foreground uppercase print:mt-1 print:block">
-          Relatório de Reservas — Gestão de Aluguel
-        </p>
       </div>
-      <div className="grid grid-cols-7 gap-1.5 sm:gap-2 print:h-full print:flex-1 print:auto-rows-fr print:gap-1 print:break-inside-avoid print:[page-break-inside:avoid]">
+
+      {/* Rótulos de dia da semana num grid próprio (não junto com as células
+          dos dias) — só assim dá pra deixar essa linha com altura fixa no
+          papel e sobrar o máximo de espaço vertical pras semanas em si,
+          que usam `auto-rows-fr` pra dividir igualmente o que sobrar da
+          folha. Mesmas colunas/gap dos dois grids garantem alinhamento. */}
+      <div className="grid grid-cols-7 gap-1.5 sm:gap-2 print:mt-2 print:shrink-0 print:gap-1">
         {DOWS.map((d) => (
           <div
             key={d}
-            className="py-1 text-center font-mono text-[10.5px] font-semibold text-muted-foreground print:py-0.5 print:text-[8px]"
+            className="py-1 text-center font-mono text-[10.5px] font-semibold text-muted-foreground print:py-0.5 print:text-[7px]"
           >
             {d}
           </div>
         ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1.5 sm:gap-2 print:flex-1 print:auto-rows-fr print:gap-1 print:break-inside-avoid print:[page-break-inside:avoid]">
         {Array.from({ length: primeiroDiaSemana }, (_, i) => (
           <div key={`lead-${i}`} aria-hidden="true" />
         ))}
-        {dias.map((dia) => (
-          <div
-            key={dia.data.toISOString()}
-            className={cn(
-              "flex min-h-24 min-w-0 flex-col gap-1 rounded-xl border border-border/60 bg-muted/40 p-1.5 text-[11.5px] sm:min-h-28 print:min-h-0 print:gap-0.5 print:rounded-md print:p-1 print:text-[9px]",
-              dia.isToday && "border-primary/40 bg-primary/5 ring-1 ring-primary/25"
-            )}
-          >
-            <span
+        {dias.map((dia) => {
+          const fimDeSemana = dia.data.getDay() === 0 || dia.data.getDay() === 6
+          return (
+            <div
+              key={dia.data.toISOString()}
               className={cn(
-                "px-0.5 text-[12px] font-bold print:text-[9px]",
-                dia.isToday ? "text-primary" : "text-foreground"
+                "flex min-h-24 min-w-0 flex-col gap-1 rounded-xl border border-border/60 bg-muted/40 p-1.5 text-[11.5px] sm:min-h-28 print:min-h-0 print:gap-0.5 print:rounded-md print:border-zinc-200 print:p-1 print:text-[9px]",
+                dia.isToday
+                  ? "border-primary/40 bg-primary/5 ring-1 ring-primary/25 print:bg-primary/5"
+                  : fimDeSemana
+                    ? "print:bg-zinc-50/80"
+                    : "print:bg-white"
               )}
             >
-              {dia.data.getDate()}
-            </span>
-            {dia.checkins.length > 0 && (
-              <div className="flex flex-col gap-1 print:gap-0.5">
-                {dia.checkins.slice(0, MAX_CARDS_POR_DIA).map((r) => (
-                  <ReservaDayCard
-                    key={r.id}
-                    reserva={r}
-                    casas={casas}
-                    modoTodasCasas={modoTodasCasas}
-                    selected={r.id === selectedReservaId}
-                    onSelect={() => onSelectReserva(r.id)}
-                  />
-                ))}
-                {dia.checkins.length > MAX_CARDS_POR_DIA && (
-                  <span className="px-1 text-[10px] text-muted-foreground print:text-[7px]">
-                    +{dia.checkins.length - MAX_CARDS_POR_DIA} mais
-                  </span>
+              <span
+                className={cn(
+                  "px-0.5 text-[12px] font-bold print:text-[13px]",
+                  dia.isToday ? "text-primary" : "text-foreground"
                 )}
-              </div>
-            )}
-            {dia.checkouts.length > 0 && (
-              <div className="flex flex-col gap-0.5">
-                {dia.checkouts.slice(0, MAX_SAIDAS_POR_DIA).map((r) => (
-                  <CheckoutBadge
-                    key={`checkout-${r.id}`}
-                    reserva={r}
-                    selected={r.id === selectedReservaId}
-                    onSelect={() => onSelectReserva(r.id)}
-                  />
-                ))}
-                {dia.checkouts.length > MAX_SAIDAS_POR_DIA && (
-                  <span className="px-1 text-[10px] text-muted-foreground print:text-[7px]">
-                    +{dia.checkouts.length - MAX_SAIDAS_POR_DIA} saídas
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
+              >
+                {dia.data.getDate()}
+              </span>
+              {dia.checkins.length > 0 && (
+                <div className="flex flex-col gap-1 print:gap-0.5">
+                  {dia.checkins.slice(0, MAX_CARDS_POR_DIA).map((r) => (
+                    <ReservaDayCard
+                      key={r.id}
+                      reserva={r}
+                      casas={casas}
+                      modoTodasCasas={modoTodasCasas}
+                      selected={r.id === selectedReservaId}
+                      onSelect={() => onSelectReserva(r.id)}
+                    />
+                  ))}
+                  {dia.checkins.length > MAX_CARDS_POR_DIA && (
+                    <span className="px-1 text-[10px] text-muted-foreground print:text-[7px]">
+                      +{dia.checkins.length - MAX_CARDS_POR_DIA} mais
+                    </span>
+                  )}
+                </div>
+              )}
+              {dia.checkouts.length > 0 && (
+                <div className="flex flex-col gap-0.5">
+                  {dia.checkouts.slice(0, MAX_SAIDAS_POR_DIA).map((r) => (
+                    <CheckoutBadge
+                      key={`checkout-${r.id}`}
+                      reserva={r}
+                      selected={r.id === selectedReservaId}
+                      onSelect={() => onSelectReserva(r.id)}
+                    />
+                  ))}
+                  {dia.checkouts.length > MAX_SAIDAS_POR_DIA && (
+                    <span className="px-1 text-[10px] text-muted-foreground print:text-[7px]">
+                      +{dia.checkouts.length - MAX_SAIDAS_POR_DIA} saídas
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
         {Array.from({ length: trailing }, (_, i) => (
           <div key={`trail-${i}`} aria-hidden="true" />
         ))}
       </div>
+
+      {ativoNaImpressao && statsImpressao && (
+        <>
+          <PrintReportLegend modoTodasCasas={modoTodasCasas} casas={casas} />
+          <PrintReportFooter stats={statsImpressao} />
+        </>
+      )}
     </section>
   )
 }
@@ -284,10 +338,21 @@ interface CalendarViewProps {
    *  o próprio mês em foco. Os demais meses do feed somem só no papel
    *  (ver `ativoNaImpressao` em MonthSection); a rolagem na tela não muda. */
   mesAtivoImpressao?: Date
+  /** "Nome da unidade" mostrado no cabeçalho do relatório impresso. */
+  nomeUnidadeImpressao?: string
 }
 
 export const CalendarView = React.forwardRef<CalendarViewHandle, CalendarViewProps>(function CalendarView(
-  { casas, reservasCasa, modoTodasCasas, selectedReservaId, onSelectReserva, onMesFocoChange, mesAtivoImpressao },
+  {
+    casas,
+    reservasCasa,
+    modoTodasCasas,
+    selectedReservaId,
+    onSelectReserva,
+    onMesFocoChange,
+    mesAtivoImpressao,
+    nomeUnidadeImpressao,
+  },
   ref
 ) {
   const hoje0 = React.useMemo(() => startOfMonth(new Date()), [])
@@ -431,6 +496,7 @@ export const CalendarView = React.forwardRef<CalendarViewHandle, CalendarViewPro
             selectedReservaId={selectedReservaId}
             onSelectReserva={onSelectReserva}
             ativoNaImpressao={mesAtivoImpressao ? isSameMonth(mes, mesAtivoImpressao) : false}
+            nomeUnidadeImpressao={nomeUnidadeImpressao ?? "Todas as casas"}
           />
         ))}
       </div>

@@ -37,6 +37,10 @@ export function DashboardPage({ data, onOpenCasas, onEditReserva, hojeSignal, on
     () => (modoTodasCasas ? data.reservas : data.reservas.filter((r) => r.casa_id === data.casaAtualId)),
     [data.reservas, data.casaAtualId, modoTodasCasas]
   )
+  // "Unidade" que aparece no cabeçalho do relatório impresso.
+  const nomeUnidadeImpressao = modoTodasCasas
+    ? "Todas as casas"
+    : (data.casas.find((c) => c.id === data.casaAtualId)?.nome ?? "—")
 
   const calendarRef = React.useRef<CalendarViewHandle>(null)
   // "Mês em foco" — o que está visível no topo do feed contínuo agora. Some
@@ -203,6 +207,7 @@ export function DashboardPage({ data, onOpenCasas, onEditReserva, hojeSignal, on
               onSelectReserva={handleSelectReserva}
               onMesFocoChange={setMesFoco}
               mesAtivoImpressao={mesFoco}
+              nomeUnidadeImpressao={nomeUnidadeImpressao}
             />
           </>
         )}
