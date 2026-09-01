@@ -229,3 +229,33 @@
     @apply font-sans;
     }
 }
+
+/* Impressão do calendário ("Imprimir / Exportar PDF" no cabeçalho do
+   dashboard) — imprime só o mês em foco, em A4 paisagem, com as cores das
+   reservas preservadas. A maior parte do ajuste (esconder botões, encolher
+   fonte, evitar quebra de página) fica direto nas classes `print:` de cada
+   componente; aqui só o que não dá pra expressar em utilitário Tailwind:
+   o tamanho físico da folha e forçar o navegador a imprimir fundos/cores. */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Barra lateral (sidebar) — some inteira, incluindo a faixa de espaço
+     que ela reserva no layout flex (data-slot="sidebar" cobre os dois). */
+  [data-slot="sidebar"] {
+    display: none !important;
+  }
+}

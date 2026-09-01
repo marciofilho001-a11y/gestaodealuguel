@@ -63,16 +63,18 @@ function ReservaDayCard({ reserva, casas, modoTodasCasas, selected, onSelect }: 
       whileHover={{ y: -1 }}
       transition={{ duration: 0.15 }}
       className={cn(
-        "flex w-full min-w-0 flex-col items-start gap-0.5 rounded-lg border border-l-[3px] bg-card py-1 pr-2 pl-2 text-left leading-tight shadow-none transition-colors",
+        "flex w-full min-w-0 flex-col items-start gap-0.5 rounded-lg border border-l-[3px] bg-card py-1 pr-2 pl-2 text-left leading-tight shadow-none transition-colors print:gap-0 print:rounded-md print:py-0.5",
         selected ? "border-primary/50 bg-primary/5 ring-1 ring-primary/30" : "border-border hover:bg-muted/60"
       )}
       style={{ borderLeftColor: cor }}
     >
-      <span className="w-full min-w-0 truncate text-[11.5px] font-semibold text-foreground">{nomeAbreviado}</span>
-      <span className="w-full min-w-0 truncate font-mono text-[10px] leading-tight tabular-nums text-muted-foreground">
+      <span className="w-full min-w-0 truncate text-[11.5px] font-semibold text-foreground print:text-[8px]">
+        {nomeAbreviado}
+      </span>
+      <span className="w-full min-w-0 truncate font-mono text-[10px] leading-tight tabular-nums text-muted-foreground print:text-[7px]">
         {formatDiaMes(reserva.checkin)} → {formatDiaMes(reserva.checkout)}
       </span>
-      <span className="w-full min-w-0 truncate font-mono text-[10px] leading-tight tabular-nums text-muted-foreground/75">
+      <span className="w-full min-w-0 truncate font-mono text-[10px] leading-tight tabular-nums text-muted-foreground/75 print:text-[7px]">
         {formatBRLCompacto(reserva.valor_total)}
       </span>
     </motion.button>
@@ -94,14 +96,14 @@ function CheckoutBadge({ reserva, selected, onSelect }: CheckoutBadgeProps) {
       type="button"
       onClick={onSelect}
       className={cn(
-        "flex w-full min-w-0 items-baseline gap-1 rounded-md px-1.5 py-0.5 text-left transition-colors",
+        "flex w-full min-w-0 items-baseline gap-1 rounded-md px-1.5 py-0.5 text-left transition-colors print:px-1 print:py-0",
         selected ? "bg-destructive/10 text-destructive" : "text-destructive/65 hover:bg-destructive/5"
       )}
     >
-      <span aria-hidden="true" className="text-[10px] leading-none">
+      <span aria-hidden="true" className="text-[10px] leading-none print:text-[7px]">
         ←
       </span>
-      <span className="min-w-0 flex-1 truncate text-[10.5px] leading-tight font-medium">
+      <span className="min-w-0 flex-1 truncate text-[10.5px] leading-tight font-medium print:text-[7px]">
         Saída · {abreviarNome(reserva.hospede) || "(sem nome)"}
       </span>
     </button>
@@ -116,6 +118,9 @@ interface MonthSectionProps {
   modoTodasCasas: boolean
   selectedReservaId: number | null
   onSelectReserva: (id: number) => void
+  /** Único mês que sobrevive na impressão — os demais somem via `print:hidden`
+   *  (o feed continua rolando normalmente na tela, só o papel filtra). */
+  ativoNaImpressao: boolean
 }
 
 function MonthSection({
@@ -126,6 +131,7 @@ function MonthSection({
   modoTodasCasas,
   selectedReservaId,
   onSelectReserva,
+  ativoNaImpressao,
 }: MonthSectionProps) {
   const key = monthKey(mes)
 
@@ -158,19 +164,37 @@ function MonthSection({
   const trailing = (7 - (totalCelulas % 7)) % 7
 
   return (
-    <section ref={sectionRef} data-month-key={key} className="scroll-mt-16">
-      <div className="mb-3 flex items-baseline gap-2.5 px-0.5">
-        <h2 className="text-2xl font-bold tracking-tight text-foreground capitalize">{nomeMes}</h2>
-        {ehMesAtual && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
-            <span className="size-1.5 rounded-full bg-primary" />
-            mês atual
-          </span>
-        )}
+    <section
+      ref={sectionRef}
+      data-month-key={key}
+      className={cn(
+        "scroll-mt-16",
+        !ativoNaImpressao && "print:hidden",
+        ativoNaImpressao && "print:flex print:h-[190mm] print:flex-col"
+      )}
+    >
+      <div className="mb-3 px-0.5 print:mb-2 print:shrink-0">
+        <div className="flex items-baseline gap-2.5">
+          <h2 className="text-2xl font-bold tracking-tight text-foreground capitalize print:text-3xl">{nomeMes}</h2>
+          {ehMesAtual && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary print:hidden">
+              <span className="size-1.5 rounded-full bg-primary" />
+              mês atual
+            </span>
+          )}
+        </div>
+        {/* Só aparece no papel — na tela o mês já está óbvio pelo rótulo do
+            cabeçalho fixo, não precisa repetir a marca aqui. */}
+        <p className="hidden text-[10px] font-medium tracking-wide text-muted-foreground uppercase print:mt-1 print:block">
+          Relatório de Reservas — Gestão de Aluguel
+        </p>
       </div>
-      <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+      <div className="grid grid-cols-7 gap-1.5 sm:gap-2 print:h-full print:flex-1 print:auto-rows-fr print:gap-1 print:break-inside-avoid print:[page-break-inside:avoid]">
         {DOWS.map((d) => (
-          <div key={d} className="py-1 text-center font-mono text-[10.5px] font-semibold text-muted-foreground">
+          <div
+            key={d}
+            className="py-1 text-center font-mono text-[10.5px] font-semibold text-muted-foreground print:py-0.5 print:text-[8px]"
+          >
             {d}
           </div>
         ))}
@@ -181,15 +205,20 @@ function MonthSection({
           <div
             key={dia.data.toISOString()}
             className={cn(
-              "flex min-h-24 min-w-0 flex-col gap-1 rounded-xl border border-border/60 bg-muted/40 p-1.5 text-[11.5px] sm:min-h-28",
+              "flex min-h-24 min-w-0 flex-col gap-1 rounded-xl border border-border/60 bg-muted/40 p-1.5 text-[11.5px] sm:min-h-28 print:min-h-0 print:gap-0.5 print:rounded-md print:p-1 print:text-[9px]",
               dia.isToday && "border-primary/40 bg-primary/5 ring-1 ring-primary/25"
             )}
           >
-            <span className={cn("px-0.5 text-[12px] font-bold", dia.isToday ? "text-primary" : "text-foreground")}>
+            <span
+              className={cn(
+                "px-0.5 text-[12px] font-bold print:text-[9px]",
+                dia.isToday ? "text-primary" : "text-foreground"
+              )}
+            >
               {dia.data.getDate()}
             </span>
             {dia.checkins.length > 0 && (
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1 print:gap-0.5">
                 {dia.checkins.slice(0, MAX_CARDS_POR_DIA).map((r) => (
                   <ReservaDayCard
                     key={r.id}
@@ -201,7 +230,7 @@ function MonthSection({
                   />
                 ))}
                 {dia.checkins.length > MAX_CARDS_POR_DIA && (
-                  <span className="px-1 text-[10px] text-muted-foreground">
+                  <span className="px-1 text-[10px] text-muted-foreground print:text-[7px]">
                     +{dia.checkins.length - MAX_CARDS_POR_DIA} mais
                   </span>
                 )}
@@ -218,7 +247,7 @@ function MonthSection({
                   />
                 ))}
                 {dia.checkouts.length > MAX_SAIDAS_POR_DIA && (
-                  <span className="px-1 text-[10px] text-muted-foreground">
+                  <span className="px-1 text-[10px] text-muted-foreground print:text-[7px]">
                     +{dia.checkouts.length - MAX_SAIDAS_POR_DIA} saídas
                   </span>
                 )}
@@ -251,10 +280,14 @@ interface CalendarViewProps {
    *  muda durante a rolagem — o dashboard usa isso pro rótulo do cabeçalho,
    *  os cards de resumo e o botão de "voltar pro mês atual". */
   onMesFocoChange?: (mes: Date) => void
+  /** Mês que deve sobreviver quando o usuário mandar imprimir — normalmente
+   *  o próprio mês em foco. Os demais meses do feed somem só no papel
+   *  (ver `ativoNaImpressao` em MonthSection); a rolagem na tela não muda. */
+  mesAtivoImpressao?: Date
 }
 
 export const CalendarView = React.forwardRef<CalendarViewHandle, CalendarViewProps>(function CalendarView(
-  { casas, reservasCasa, modoTodasCasas, selectedReservaId, onSelectReserva, onMesFocoChange },
+  { casas, reservasCasa, modoTodasCasas, selectedReservaId, onSelectReserva, onMesFocoChange, mesAtivoImpressao },
   ref
 ) {
   const hoje0 = React.useMemo(() => startOfMonth(new Date()), [])
@@ -397,12 +430,13 @@ export const CalendarView = React.forwardRef<CalendarViewHandle, CalendarViewPro
             modoTodasCasas={modoTodasCasas}
             selectedReservaId={selectedReservaId}
             onSelectReserva={onSelectReserva}
+            ativoNaImpressao={mesAtivoImpressao ? isSameMonth(mes, mesAtivoImpressao) : false}
           />
         ))}
       </div>
       <div ref={bottomSentinelRef} aria-hidden="true" className="h-px" />
 
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-border pt-3 text-[11px] text-muted-foreground">
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-border pt-3 text-[11px] text-muted-foreground print:hidden">
         {modoTodasCasas
           ? casas.map((c) => (
               <span key={c.id} className="flex items-center gap-1.5">

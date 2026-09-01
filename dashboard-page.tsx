@@ -1,6 +1,6 @@
 import * as React from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { ArrowUp, BellRing, ChevronLeft, ChevronRight, Home as HomeIcon, ListChecks } from "lucide-react"
+import { ArrowUp, BellRing, ChevronLeft, ChevronRight, Home as HomeIcon, ListChecks, Printer } from "lucide-react"
 
 import { AlertasPanel } from "@/components/alertas-panel"
 import { CalendarView, type CalendarViewHandle } from "@/components/calendar-view"
@@ -128,7 +128,7 @@ export function DashboardPage({ data, onOpenCasas, onEditReserva, hojeSignal, on
 
   return (
     <>
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/85 px-4 py-2.5 backdrop-blur">
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/85 px-4 py-2.5 backdrop-blur print:hidden">
         <SidebarTrigger />
         <ButtonGroup>
           <Button variant="ghost" size="icon" className="size-7 text-muted-foreground" onClick={() => handleMudarMes(-1)}>
@@ -149,7 +149,17 @@ export function DashboardPage({ data, onOpenCasas, onEditReserva, hojeSignal, on
           <span className="sr-only">Alertas</span>
         </Button>
         {data.casas.length > 0 && (
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-7"
+              onClick={() => window.print()}
+              title="Imprimir / Exportar PDF"
+            >
+              <Printer className="size-4" />
+              <span className="sr-only">Imprimir / Exportar PDF</span>
+            </Button>
             <NovaReservaDialog
               casas={data.casas}
               casaAtualId={data.casaAtualId}
@@ -175,12 +185,15 @@ export function DashboardPage({ data, onOpenCasas, onEditReserva, hojeSignal, on
           </Empty>
         ) : (
           <>
-            <SummaryCards reservasCasa={reservasCasa} mesAtual={mesFoco} />
+            <div className="print:hidden">
+              <SummaryCards reservasCasa={reservasCasa} mesAtual={mesFoco} />
+            </div>
 
             {/* Feed vertical contínuo — os meses rolam em sequência (estilo
                 Airbnb Host Calendar) em vez de paginar um mês por vez. A
                 tabela de reservas saiu daqui: agora vive no Bottom Sheet
-                aberto pela pílula flutuante logo abaixo. */}
+                aberto pela pílula flutuante logo abaixo. Na impressão só o
+                mês em foco (`mesFoco`) sobrevive — ver CalendarView. */}
             <CalendarView
               ref={calendarRef}
               casas={data.casas}
@@ -189,6 +202,7 @@ export function DashboardPage({ data, onOpenCasas, onEditReserva, hojeSignal, on
               selectedReservaId={selectedReservaId}
               onSelectReserva={handleSelectReserva}
               onMesFocoChange={setMesFoco}
+              mesAtivoImpressao={mesFoco}
             />
           </>
         )}
@@ -199,7 +213,7 @@ export function DashboardPage({ data, onOpenCasas, onEditReserva, hojeSignal, on
           <SheetTrigger asChild>
             <button
               type="button"
-              className="fixed bottom-6 left-1/2 z-40 flex max-w-[calc(100%-2rem)] -translate-x-1/2 cursor-pointer items-center gap-3 rounded-full bg-foreground px-5 py-2.5 text-background shadow-2xl transition-transform hover:scale-105 active:scale-100"
+              className="fixed bottom-6 left-1/2 z-40 flex max-w-[calc(100%-2rem)] -translate-x-1/2 cursor-pointer items-center gap-3 rounded-full bg-foreground px-5 py-2.5 text-background shadow-2xl transition-transform hover:scale-105 active:scale-100 print:hidden"
             >
               <ListChecks className="size-4 shrink-0" />
               <span className="truncate text-sm font-medium">
@@ -216,7 +230,7 @@ export function DashboardPage({ data, onOpenCasas, onEditReserva, hojeSignal, on
           <SheetContent
             side="bottom"
             style={{ height: "min(85vh, 46rem)" }}
-            className="flex flex-col gap-0 rounded-t-3xl p-0"
+            className="flex flex-col gap-0 rounded-t-3xl p-0 print:hidden"
           >
             <div className="mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-muted" aria-hidden="true" />
             <SheetHeader className="border-b border-border px-4 pt-2 pb-3">
@@ -246,7 +260,7 @@ export function DashboardPage({ data, onOpenCasas, onEditReserva, hojeSignal, on
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8, y: 8 }}
             transition={{ duration: 0.15 }}
-            className="fixed right-4 bottom-24 z-40 flex size-11 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-lg transition-colors hover:bg-accent sm:right-6"
+            className="fixed right-4 bottom-24 z-40 flex size-11 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-lg transition-colors hover:bg-accent sm:right-6 print:hidden"
             aria-label="Voltar para o mês atual"
             title="Voltar para o mês atual"
           >
@@ -256,7 +270,7 @@ export function DashboardPage({ data, onOpenCasas, onEditReserva, hojeSignal, on
       </AnimatePresence>
 
       <Sheet open={painelAberto} onOpenChange={handlePainelOpenChange}>
-        <SheetContent className="w-full gap-0 overflow-y-auto sm:max-w-sm">
+        <SheetContent className="w-full gap-0 overflow-y-auto sm:max-w-sm print:hidden">
           <SheetHeader className="border-b border-border">
             <SheetTitle>{reservaSelecionada ? "Reserva selecionada" : "Alertas"}</SheetTitle>
           </SheetHeader>
