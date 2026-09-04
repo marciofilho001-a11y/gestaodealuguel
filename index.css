@@ -38,6 +38,9 @@
     --color-chart-3: var(--chart-3);
     --color-chart-2: var(--chart-2);
     --color-chart-1: var(--chart-1);
+    /* Rótulo do RingChart (componente Uilora/Bklit) — reaproveita o token
+       muted-foreground que já existe, em vez de inventar uma cor nova. */
+    --color-chart-label: var(--muted-foreground);
     --color-ring: var(--ring);
     --color-input: var(--input);
     --color-border: var(--border);

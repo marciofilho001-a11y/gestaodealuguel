@@ -1,14 +1,14 @@
 import * as React from "react"
 import { motion } from "framer-motion"
-import { Cell, Pie, PieChart } from "recharts"
 import { ArrowLeft, UserRound, Wallet } from "lucide-react"
 import { Link } from "react-router-dom"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ChartContainer, ChartTooltip } from "@/components/ui/chart"
-import type { ChartConfig } from "@/components/ui/chart"
+import { Ring } from "@/components/ring"
+import { RingCenter } from "@/components/ring-center"
+import { RingChart } from "@/components/ring-chart"
 import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { PlatformIcon } from "@/components/platform-icon"
@@ -72,33 +72,6 @@ function GanhosCard({ label, value, hero, index }: { label: string; value: strin
 const COR_LIQUIDO = "#059669" // esmeralda 600 — mesma cor já validada no resto da página
 const COR_TAXAS_PLATAFORMA = "#d97706" // âmbar 600
 const COR_COMISSAO_MARCIO = "#7c3aed" // violeta 600 — mesma cor já validada no resto da página
-
-interface DonutTooltipPayloadItem {
-  name?: string
-  value?: number | string
-  payload?: { color?: string }
-}
-
-// Tooltip flutuante do donut — mesmo padrão zinc/branco fixo (igual em claro
-// e escuro) já usado nos outros elementos de gráfico desta página.
-function DonutTooltip({ active, payload }: { active?: boolean; payload?: DonutTooltipPayloadItem[] }) {
-  if (!active || !payload?.length) return null
-  const item = payload[0]
-  return (
-    <div className="rounded-xl border border-zinc-200 bg-white/95 p-3 text-xs font-medium text-zinc-900 shadow-lg dark:border-zinc-800 dark:bg-zinc-900/90 dark:text-zinc-100">
-      <div className="flex items-center gap-2">
-        <span className="size-2 shrink-0 rounded-full" style={{ background: item.payload?.color }} />
-        <span className="text-muted-foreground dark:text-zinc-400">{item.name}</span>
-        <span className="ml-auto pl-3 font-mono font-semibold tabular-nums">{formatBRL(Number(item.value))}</span>
-      </div>
-    </div>
-  )
-}
-
-// ChartContainer exige um ChartConfig, mas o donut colore cada fatia via
-// <Cell fill> direto (cor por entidade/plataforma, não por --color-N do
-// tema) — não há série alguma pra declarar aqui.
-const donutChartConfig = {} satisfies ChartConfig
 
 // Card de plataforma com spotlight — é um <button> (precisa ser clicável
 // pro drilldown), então não dá pra usar <SpotlightCard> (que é um <div>);
@@ -513,24 +486,26 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
                 <div className="mb-3 text-xs font-medium text-muted-foreground">Distribuição por plataforma</div>
                 {donutData.length > 0 ? (
                   <div className="flex flex-1 items-center gap-6">
-                    <ChartContainer config={donutChartConfig} className="mx-auto aspect-square h-36 w-36 shrink-0">
-                      <PieChart>
-                        <ChartTooltip content={<DonutTooltip />} />
-                        <Pie
-                          data={donutData}
-                          dataKey="valor"
-                          nameKey="nome"
-                          innerRadius="62%"
-                          outerRadius="100%"
-                          paddingAngle={3}
-                          strokeWidth={0}
-                        >
-                          {donutData.map((d) => (
-                            <Cell key={d.nome} fill={d.color} />
-                          ))}
-                        </Pie>
-                      </PieChart>
-                    </ChartContainer>
+                    {/* Anéis concêntricos (componente Ring Chart, instalado via
+                        registry Bklit) no lugar do donut do Recharts — cada
+                        anel é a fatia de uma plataforma na Comissão Marcio,
+                        crescendo do centro pra fora. Passar o mouse num anel
+                        troca o número do centro pelo valor daquela plataforma. */}
+                    <RingChart
+                      data={donutData.map((d) => ({
+                        label: d.nome,
+                        value: d.valor,
+                        maxValue: resultado.comissaoMarcioTotal,
+                        color: d.color,
+                      }))}
+                      size={144}
+                      className="mx-auto shrink-0"
+                    >
+                      {donutData.map((d, i) => (
+                        <Ring key={d.nome} index={i} />
+                      ))}
+                      <RingCenter defaultLabel="Total" formatOptions={{ style: "currency", currency: "BRL", maximumFractionDigits: 0 }} />
+                    </RingChart>
                     <div className="flex flex-1 flex-col gap-2">
                       {donutData.map((d) => (
                         <button
