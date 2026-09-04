@@ -6,9 +6,16 @@ import { Link } from "react-router-dom"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Area } from "@/components/area"
+import { AreaChart } from "@/components/area-chart"
+import { Grid } from "@/components/grid"
+import { LineChart } from "@/components/line-chart"
+import { profitLossColor, ProfitLossLine } from "@/components/profit-loss-line"
 import { Ring } from "@/components/ring"
 import { RingCenter } from "@/components/ring-center"
 import { RingChart } from "@/components/ring-chart"
+import { ChartTooltip } from "@/components/chart-tooltip-kit"
+import { XAxis } from "@/components/x-axis"
 import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { PlatformIcon } from "@/components/platform-icon"
@@ -36,6 +43,15 @@ const todasValue = "__todas__"
 // do componente Table genérico.
 const th = "text-eyebrow px-4 py-3 text-muted-foreground"
 const td = "px-4 py-3"
+
+// Noites de uma reserva — usado só pra espalhar comissão/comissão Marcio
+// (que são valores da estadia inteira) proporcionalmente entre os dias da
+// série de evolução, igual o resto do app já faz com valor_diaria.
+function noitesDaReserva(r: Reserva): number {
+  const ci = new Date(r.checkin)
+  const co = new Date(r.checkout)
+  return Math.max(1, Math.round((co.getTime() - ci.getTime()) / 86400000))
+}
 
 function GanhosCard({ label, value, hero, index }: { label: string; value: string; hero?: boolean; index: number }) {
   return (
@@ -204,6 +220,35 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
 
   const nomeCasa = casaFiltro === todasValue ? "Todas as casas" : casas.find((c) => c.id === Number(casaFiltro))?.nome
 
+  // Série dia a dia (bruto/líquido) pro Area Chart e pro Profit/Loss Line —
+  // mesma ideia do sparkline do dashboard (ver summary-cards.tsx: espalha
+  // valor_diaria pelas noites em que a reserva está ativa), só que cobrindo
+  // o período inteiro escolhido aqui, não só um mês. É uma aproximação
+  // visual de tendência, não um fechamento contábil — os números exatos são
+  // os cards acima.
+  const evolucao = React.useMemo(() => {
+    if (!de || !ate) return []
+    const inicio = new Date(`${de}T00:00:00`)
+    const fim = new Date(`${ate}T00:00:00`)
+    const pontos: { date: Date; bruto: number; liquido: number }[] = []
+    for (let t = inicio.getTime(); t <= fim.getTime(); t += 86400000) {
+      const dia = new Date(t)
+      let bruto = 0
+      let liquido = 0
+      for (const r of resultado.filtradas) {
+        const ci = new Date(r.checkin)
+        const co = new Date(r.checkout)
+        if (dia < ci || dia >= co) continue
+        const noites = noitesDaReserva(r)
+        const brutoDia = Number(r.valor_diaria) || 0
+        bruto += brutoDia
+        liquido += brutoDia - comissaoPlataformaEfetiva(r) / noites - (Number(r.comissao_marcio) || 0) / noites
+      }
+      pontos.push({ date: dia, bruto, liquido })
+    }
+    return pontos
+  }, [resultado.filtradas, de, ate])
+
   // Fatias do donut de Comissão Marcio Filho — sempre por plataforma (é a
   // identidade que dá cor à fatia via PLATFORM_COLOR, a mesma usada nos
   // badges e no calendário). Fatias zeradas ficam de fora do donut.
@@ -358,6 +403,54 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
             <GanhosCard index={5} label="Taxas Limpeza" value={formatBRL(resultado.limpezaTotal)} />
             <GanhosCard index={6} label="Descontos" value={formatBRL(resultado.descontoTotal)} />
           </div>
+
+          {/* Evolução no período — Area Chart (bruto) e Profit/Loss Line
+              (líquido, verde acima de zero / vermelho abaixo), componentes
+              Bklit instalados via Uilora. Some com menos de 2 pontos (não dá
+              pra desenhar uma linha com 1 dia só). */}
+          {evolucao.length > 1 && (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-section-title text-foreground/80">Bruto no período</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <AreaChart data={evolucao} xDataKey="date" aspectRatio="16 / 9">
+                    <Grid horizontal />
+                    <Area dataKey="bruto" fill="var(--chart-line-primary)" />
+                    <XAxis />
+                    <ChartTooltip
+                      rows={(point: Record<string, unknown>) => [
+                        { color: "var(--chart-line-primary)", label: "Bruto", value: formatBRL(point.bruto as number) },
+                      ]}
+                    />
+                  </AreaChart>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-section-title text-foreground/80">Líquido no período</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <LineChart data={evolucao} xDataKey="date" aspectRatio="16 / 9">
+                    <Grid highlightRowValues={[0]} horizontal />
+                    <ProfitLossLine dataKey="liquido" />
+                    <XAxis />
+                    <ChartTooltip
+                      indicatorColor={(point: Record<string, unknown>) => profitLossColor((point.liquido as number) ?? 0)}
+                      rows={(point: Record<string, unknown>) => [
+                        {
+                          color: profitLossColor((point.liquido as number) ?? 0),
+                          label: "Líquido",
+                          value: formatBRL(point.liquido as number),
+                        },
+                      ]}
+                    />
+                  </LineChart>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {resultado.porCasa.length > 0 && (
             <Card>
