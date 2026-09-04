@@ -6,8 +6,6 @@ import { Link } from "react-router-dom"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Area } from "@/components/area"
-import { AreaChart } from "@/components/area-chart"
 import { Bar } from "@/components/bar"
 import { BarChart } from "@/components/bar-chart"
 import { BarXAxis } from "@/components/bar-x-axis"
@@ -54,15 +52,27 @@ function chaveDia(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 }
 
-// Um ponto por dia na série de evolução — é o dia do CHECK-IN, com o valor
-// da(s) reserva(s) inteira(s) que entraram naquele dia (não espalhado pelas
-// noites), pra bater com a pergunta "o que gerou essa receita".
+const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+
+// Períodos com mais de 60 dias (ex: "Ano Atual") viram visão mensal — 12
+// barras agregadas em vez de ~365 pontos diários, ilegível num card. Abaixo
+// disso (ex: "Mês Atual") continua dia a dia.
+const LIMITE_DIAS_VISAO_MENSAL = 60
+
+// Um ponto por dia OU por mês na série de evolução, dependendo da
+// granularidade do período (ver LIMITE_DIAS_VISAO_MENSAL). No modo diário é
+// o dia do CHECK-IN, com o valor da(s) reserva(s) inteira(s) que entraram
+// naquele dia (não espalhado pelas noites), pra bater com a pergunta "o que
+// gerou essa receita". `label` só existe no modo mensal — um rótulo curto
+// tipo "Jan/26" pro eixo do gráfico de barras, evitando que a formatação de
+// data do componente (dia + mês) mostre "1 de jan." pra um mês inteiro.
 interface PontoEvolucao {
   date: Date
+  label?: string
   bruto: number
   taxas: number
   liquido: number
-  /** Hóspede(s) que fizeram check-in nesse dia — undefined = dia sem check-in. */
+  /** Quem gerou o valor — hóspede(s) (modo diário) ou "N reservas" (modo mensal); undefined = sem check-in. */
   origem?: string
   // Os componentes de gráfico (Bklit) esperam Record<string, unknown>[] —
   // essa assinatura de índice deixa PontoEvolucao[] atribuível direto,
@@ -71,13 +81,16 @@ interface PontoEvolucao {
 }
 
 // Conteúdo rico do tooltip (Area/Bar/Line) — mostra a origem do valor
-// (hóspede) e a composição Bruto → Taxas → Líquido, não só o número seco.
-function EvolucaoTooltipContent({ point }: { point: Record<string, unknown> }) {
+// (hóspede, ou contagem de reservas no modo mensal) e a composição Bruto →
+// Taxas → Líquido, não só o número seco.
+function EvolucaoTooltipContent({ point, granularidade }: { point: Record<string, unknown>; granularidade: "dia" | "mes" }) {
   const p = point as unknown as PontoEvolucao
   return (
     <div className="min-w-48 px-3 py-2.5">
       <div className="mb-1.5 text-xs font-medium text-chart-tooltip-foreground">
-        {p.date.toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}
+        {granularidade === "mes"
+          ? p.date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+          : p.date.toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}
       </div>
       {p.origem ? (
         <>
@@ -98,7 +111,9 @@ function EvolucaoTooltipContent({ point }: { point: Record<string, unknown> }) {
           </div>
         </>
       ) : (
-        <div className="text-xs text-chart-tooltip-muted">Sem check-in nesse dia</div>
+        <div className="text-xs text-chart-tooltip-muted">
+          {granularidade === "mes" ? "Sem check-in nesse mês" : "Sem check-in nesse dia"}
+        </div>
       )}
     </div>
   )
@@ -109,7 +124,7 @@ function EvolucaoTooltipContent({ point }: { point: Record<string, unknown> }) {
 // de data aqui é livre, então comparamos com o trecho imediatamente antes).
 function KpiHeader({ label, valor, variacaoPct }: { label: string; valor: number; variacaoPct: number | null }) {
   return (
-    <div className="mb-3 flex items-baseline justify-between gap-3">
+    <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
       <div>
         <div className="text-eyebrow text-muted-foreground">{label}</div>
         <div className="font-mono text-2xl font-bold tabular-nums">{formatBRL(valor)}</div>
@@ -299,16 +314,58 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
 
   const nomeCasa = casaFiltro === todasValue ? "Todas as casas" : casas.find((c) => c.id === Number(casaFiltro))?.nome
 
-  // Série "por dia de check-in" pro Area Chart, Bar Chart e Profit/Loss
-  // Line — um ponto por dia, com o valor da(s) reserva(s) inteira(s) que
-  // entraram naquele dia (não espalhado pelas noites da estadia), pra cada
-  // pico do gráfico corresponder a uma reserva de verdade que o tooltip
-  // consegue explicar. Dias sem check-in ficam com valor zero (mantém o
-  // eixo do tempo contínuo).
+  // Granularidade da série — mensal (12 barras agregadas) pra períodos
+  // longos tipo "Ano Atual", diária (uma barra por dia) pra períodos curtos
+  // tipo "Mês Atual". Ver LIMITE_DIAS_VISAO_MENSAL.
+  const periodoDias =
+    de && ate ? Math.round((new Date(`${ate}T00:00:00`).getTime() - new Date(`${de}T00:00:00`).getTime()) / 86400000) + 1 : 0
+  const granularidade: "dia" | "mes" = periodoDias > LIMITE_DIAS_VISAO_MENSAL ? "mes" : "dia"
+
+  // Série pro Area/Bar Chart e pro Profit/Loss Line (fallback de líquido
+  // negativo) — um ponto por dia OU por mês de CHECK-IN (não espalhado
+  // pelas noites da estadia), pra cada pico do gráfico corresponder a uma
+  // reserva de verdade que o tooltip consegue explicar. Dias/meses sem
+  // check-in ficam com valor zero (mantém o eixo do tempo contínuo).
   const evolucao = React.useMemo(() => {
     if (!de || !ate) return []
     let candidatas = reservas.filter((r) => r.status !== "cancelada" && r.checkin >= de && r.checkin <= ate)
     if (casaFiltro !== todasValue) candidatas = candidatas.filter((r) => r.casa_id === Number(casaFiltro))
+
+    const inicio = new Date(`${de}T00:00:00`)
+    const fim = new Date(`${ate}T00:00:00`)
+
+    if (granularidade === "mes") {
+      const porMes = new Map<string, { bruto: number; taxas: number; qtd: number }>()
+      for (const r of candidatas) {
+        const ci = new Date(`${r.checkin}T00:00:00`)
+        const chave = `${ci.getFullYear()}-${String(ci.getMonth() + 1).padStart(2, "0")}`
+        const bruto = valorBrutoEfetivo(r)
+        const taxas = comissaoPlataformaEfetiva(r) + (Number(r.comissao_marcio) || 0)
+        const acumulado = porMes.get(chave) ?? { bruto: 0, taxas: 0, qtd: 0 }
+        acumulado.bruto += bruto
+        acumulado.taxas += taxas
+        acumulado.qtd += 1
+        porMes.set(chave, acumulado)
+      }
+
+      const pontos: PontoEvolucao[] = []
+      const cursor = new Date(inicio.getFullYear(), inicio.getMonth(), 1)
+      const limite = new Date(fim.getFullYear(), fim.getMonth(), 1)
+      while (cursor.getTime() <= limite.getTime()) {
+        const chave = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`
+        const registrado = porMes.get(chave)
+        pontos.push({
+          date: new Date(cursor),
+          label: `${MESES_ABREV[cursor.getMonth()]}/${String(cursor.getFullYear()).slice(2)}`,
+          bruto: registrado?.bruto ?? 0,
+          taxas: registrado?.taxas ?? 0,
+          liquido: (registrado?.bruto ?? 0) - (registrado?.taxas ?? 0),
+          origem: registrado?.qtd ? `${registrado.qtd} reserva${registrado.qtd > 1 ? "s" : ""}` : undefined,
+        })
+        cursor.setMonth(cursor.getMonth() + 1)
+      }
+      return pontos
+    }
 
     const porDia = new Map<string, { bruto: number; taxas: number; hospedes: string[] }>()
     for (const r of candidatas) {
@@ -321,8 +378,6 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
       porDia.set(r.checkin, acumulado)
     }
 
-    const inicio = new Date(`${de}T00:00:00`)
-    const fim = new Date(`${ate}T00:00:00`)
     const pontos: PontoEvolucao[] = []
     for (let t = inicio.getTime(); t <= fim.getTime(); t += 86400000) {
       const dia = new Date(t)
@@ -336,7 +391,7 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
       })
     }
     return pontos
-  }, [reservas, casaFiltro, de, ate])
+  }, [reservas, casaFiltro, de, ate, granularidade])
 
   // Líquido pode, em tese, ficar negativo num dia (desconto maior que o
   // bruto) — o Bar Chart da Bklit só sabe desenhar barras a partir de zero
@@ -526,24 +581,29 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
             <GanhosCard index={6} label="Descontos" value={formatBRL(resultado.descontoTotal)} />
           </div>
 
-          {/* Evolução no período — um ponto por dia de check-in (não
-              espalhado pelas noites), pra cada pico corresponder a uma
-              reserva de verdade e o tooltip poder explicar de onde veio.
-              Bruto em Area Chart, Líquido em Bar Chart (linha ficava "seca"
-              com dado pontual — cai pra Profit/Loss Line só no caso raro de
-              líquido negativo, que o Bar Chart da Bklit não desenha).
-              Some com menos de 2 pontos (não dá pra desenhar com 1 dia só). */}
+          {/* Evolução no período — um ponto por dia OU por mês de check-in
+              (nunca espalhado pelas noites), pra cada barra corresponder a
+              reserva(s) de verdade que o tooltip consegue explicar.
+              "Mês Atual"/períodos curtos: uma barra por dia. "Ano Atual"/
+              períodos > 60 dias: agregado em 12 barras por mês (ver
+              LIMITE_DIAS_VISAO_MENSAL) — 365 barras diárias não caberiam
+              legíveis no card. Bar Chart nos dois casos (bruto e líquido);
+              líquido cai pra Profit/Loss Line (linha) só no caso raro de
+              ficar negativo, que o Bar Chart da Bklit não desenha.
+              Margem generosa (padding) já é o padrão de Area/Bar/LineChart
+              — barra/linha nunca encosta na borda do card. Some com menos
+              de 2 pontos (não dá pra comparar com 1 barra só). */}
           {evolucao.length > 1 && (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <Card>
                 <CardContent>
                   <KpiHeader label="Total Bruto no período" valor={resultado.valorBruto} variacaoPct={variacaoPct(resultado.valorBruto, periodoAnterior?.bruto)} />
-                  <AreaChart data={evolucao} xDataKey="date" aspectRatio="16 / 9">
+                  <BarChart data={evolucao} xDataKey={granularidade === "mes" ? "label" : "date"} aspectRatio="16 / 9">
                     <Grid horizontal />
-                    <Area dataKey="bruto" fill="var(--chart-line-primary)" />
-                    <XAxis />
-                    <ChartTooltip content={({ point }) => <EvolucaoTooltipContent point={point} />} />
-                  </AreaChart>
+                    <Bar dataKey="bruto" fill="var(--chart-line-primary)" />
+                    <BarXAxis />
+                    <ChartTooltip content={({ point }) => <EvolucaoTooltipContent granularidade={granularidade} point={point} />} />
+                  </BarChart>
                 </CardContent>
               </Card>
               <Card>
@@ -559,16 +619,16 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
                       <ProfitLossLine dataKey="liquido" />
                       <XAxis />
                       <ChartTooltip
-                        content={({ point }) => <EvolucaoTooltipContent point={point} />}
+                        content={({ point }) => <EvolucaoTooltipContent granularidade={granularidade} point={point} />}
                         indicatorColor={(point: Record<string, unknown>) => profitLossColor((point.liquido as number) ?? 0)}
                       />
                     </LineChart>
                   ) : (
-                    <BarChart data={evolucao} xDataKey="date" aspectRatio="16 / 9">
+                    <BarChart data={evolucao} xDataKey={granularidade === "mes" ? "label" : "date"} aspectRatio="16 / 9">
                       <Grid horizontal />
                       <Bar dataKey="liquido" fill="var(--color-emerald-500)" />
                       <BarXAxis />
-                      <ChartTooltip content={({ point }) => <EvolucaoTooltipContent point={point} />} />
+                      <ChartTooltip content={({ point }) => <EvolucaoTooltipContent granularidade={granularidade} point={point} />} />
                     </BarChart>
                   )}
                 </CardContent>
