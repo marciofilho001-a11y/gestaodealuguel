@@ -1,6 +1,6 @@
 import * as React from "react"
 import { motion } from "framer-motion"
-import { ArrowLeft, UserRound, Wallet } from "lucide-react"
+import { ArrowLeft, TrendingDown, TrendingUp, UserRound, Wallet } from "lucide-react"
 import { Link } from "react-router-dom"
 
 import { Badge } from "@/components/ui/badge"
@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Area } from "@/components/area"
 import { AreaChart } from "@/components/area-chart"
+import { Bar } from "@/components/bar"
+import { BarChart } from "@/components/bar-chart"
+import { BarXAxis } from "@/components/bar-x-axis"
 import { Grid } from "@/components/grid"
 import { LineChart } from "@/components/line-chart"
 import { profitLossColor, ProfitLossLine } from "@/components/profit-loss-line"
@@ -44,13 +47,89 @@ const todasValue = "__todas__"
 const th = "text-eyebrow px-4 py-3 text-muted-foreground"
 const td = "px-4 py-3"
 
-// Noites de uma reserva — usado só pra espalhar comissão/comissão Marcio
-// (que são valores da estadia inteira) proporcionalmente entre os dias da
-// série de evolução, igual o resto do app já faz com valor_diaria.
-function noitesDaReserva(r: Reserva): number {
-  const ci = new Date(r.checkin)
-  const co = new Date(r.checkout)
-  return Math.max(1, Math.round((co.getTime() - ci.getTime()) / 86400000))
+// Chave "AAAA-MM-DD" a partir de um Date local — mesma ideia do monthKey()
+// do calendar-view.tsx, evita o desvio de fuso de Date.toISOString() (que
+// converte pra UTC antes de cortar a data).
+function chaveDia(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
+
+// Um ponto por dia na série de evolução — é o dia do CHECK-IN, com o valor
+// da(s) reserva(s) inteira(s) que entraram naquele dia (não espalhado pelas
+// noites), pra bater com a pergunta "o que gerou essa receita".
+interface PontoEvolucao {
+  date: Date
+  bruto: number
+  taxas: number
+  liquido: number
+  /** Hóspede(s) que fizeram check-in nesse dia — undefined = dia sem check-in. */
+  origem?: string
+  // Os componentes de gráfico (Bklit) esperam Record<string, unknown>[] —
+  // essa assinatura de índice deixa PontoEvolucao[] atribuível direto,
+  // sem precisar converter em cada uso.
+  [key: string]: unknown
+}
+
+// Conteúdo rico do tooltip (Area/Bar/Line) — mostra a origem do valor
+// (hóspede) e a composição Bruto → Taxas → Líquido, não só o número seco.
+function EvolucaoTooltipContent({ point }: { point: Record<string, unknown> }) {
+  const p = point as unknown as PontoEvolucao
+  return (
+    <div className="min-w-48 px-3 py-2.5">
+      <div className="mb-1.5 text-xs font-medium text-chart-tooltip-foreground">
+        {p.date.toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}
+      </div>
+      {p.origem ? (
+        <>
+          <div className="mb-2 text-xs text-chart-tooltip-muted">{p.origem}</div>
+          <div className="space-y-1 text-xs">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-chart-tooltip-muted">Bruto</span>
+              <span className="font-medium text-chart-tooltip-foreground tabular-nums">{formatBRL(p.bruto)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-chart-tooltip-muted">Taxas</span>
+              <span className="font-medium text-chart-tooltip-foreground tabular-nums">-{formatBRL(p.taxas)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-4 border-white/10 border-t pt-1">
+              <span className="text-chart-tooltip-muted">Líquido</span>
+              <span className="font-semibold text-chart-tooltip-foreground tabular-nums">{formatBRL(p.liquido)}</span>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="text-xs text-chart-tooltip-muted">Sem check-in nesse dia</div>
+      )}
+    </div>
+  )
+}
+
+// KPI acima de cada gráfico — total do período + variação vs. o período
+// anterior de mesma duração (não necessariamente "mês anterior": o filtro
+// de data aqui é livre, então comparamos com o trecho imediatamente antes).
+function KpiHeader({ label, valor, variacaoPct }: { label: string; valor: number; variacaoPct: number | null }) {
+  return (
+    <div className="mb-3 flex items-baseline justify-between gap-3">
+      <div>
+        <div className="text-eyebrow text-muted-foreground">{label}</div>
+        <div className="font-mono text-2xl font-bold tabular-nums">{formatBRL(valor)}</div>
+      </div>
+      {variacaoPct !== null && (
+        <span
+          className={cn(
+            "flex items-center gap-1 rounded-full px-2 py-0.5 font-medium text-xs tabular-nums",
+            variacaoPct >= 0
+              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+              : "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400"
+          )}
+        >
+          {variacaoPct >= 0 ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+          {variacaoPct >= 0 ? "+" : ""}
+          {variacaoPct.toFixed(0)}% vs. período anterior
+        </span>
+      )}
+    </div>
+  )
 }
 
 function GanhosCard({ label, value, hero, index }: { label: string; value: string; hero?: boolean; index: number }) {
@@ -220,34 +299,77 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
 
   const nomeCasa = casaFiltro === todasValue ? "Todas as casas" : casas.find((c) => c.id === Number(casaFiltro))?.nome
 
-  // Série dia a dia (bruto/líquido) pro Area Chart e pro Profit/Loss Line —
-  // mesma ideia do sparkline do dashboard (ver summary-cards.tsx: espalha
-  // valor_diaria pelas noites em que a reserva está ativa), só que cobrindo
-  // o período inteiro escolhido aqui, não só um mês. É uma aproximação
-  // visual de tendência, não um fechamento contábil — os números exatos são
-  // os cards acima.
+  // Série "por dia de check-in" pro Area Chart, Bar Chart e Profit/Loss
+  // Line — um ponto por dia, com o valor da(s) reserva(s) inteira(s) que
+  // entraram naquele dia (não espalhado pelas noites da estadia), pra cada
+  // pico do gráfico corresponder a uma reserva de verdade que o tooltip
+  // consegue explicar. Dias sem check-in ficam com valor zero (mantém o
+  // eixo do tempo contínuo).
   const evolucao = React.useMemo(() => {
     if (!de || !ate) return []
+    let candidatas = reservas.filter((r) => r.status !== "cancelada" && r.checkin >= de && r.checkin <= ate)
+    if (casaFiltro !== todasValue) candidatas = candidatas.filter((r) => r.casa_id === Number(casaFiltro))
+
+    const porDia = new Map<string, { bruto: number; taxas: number; hospedes: string[] }>()
+    for (const r of candidatas) {
+      const bruto = valorBrutoEfetivo(r)
+      const taxas = comissaoPlataformaEfetiva(r) + (Number(r.comissao_marcio) || 0)
+      const acumulado = porDia.get(r.checkin) ?? { bruto: 0, taxas: 0, hospedes: [] }
+      acumulado.bruto += bruto
+      acumulado.taxas += taxas
+      if (r.hospede) acumulado.hospedes.push(r.hospede)
+      porDia.set(r.checkin, acumulado)
+    }
+
     const inicio = new Date(`${de}T00:00:00`)
     const fim = new Date(`${ate}T00:00:00`)
-    const pontos: { date: Date; bruto: number; liquido: number }[] = []
+    const pontos: PontoEvolucao[] = []
     for (let t = inicio.getTime(); t <= fim.getTime(); t += 86400000) {
       const dia = new Date(t)
-      let bruto = 0
-      let liquido = 0
-      for (const r of resultado.filtradas) {
-        const ci = new Date(r.checkin)
-        const co = new Date(r.checkout)
-        if (dia < ci || dia >= co) continue
-        const noites = noitesDaReserva(r)
-        const brutoDia = Number(r.valor_diaria) || 0
-        bruto += brutoDia
-        liquido += brutoDia - comissaoPlataformaEfetiva(r) / noites - (Number(r.comissao_marcio) || 0) / noites
-      }
-      pontos.push({ date: dia, bruto, liquido })
+      const registrado = porDia.get(chaveDia(dia))
+      pontos.push({
+        date: dia,
+        bruto: registrado?.bruto ?? 0,
+        taxas: registrado?.taxas ?? 0,
+        liquido: (registrado?.bruto ?? 0) - (registrado?.taxas ?? 0),
+        origem: registrado?.hospedes.length ? registrado.hospedes.join(", ") : undefined,
+      })
     }
     return pontos
-  }, [resultado.filtradas, de, ate])
+  }, [reservas, casaFiltro, de, ate])
+
+  // Líquido pode, em tese, ficar negativo num dia (desconto maior que o
+  // bruto) — o Bar Chart da Bklit só sabe desenhar barras a partir de zero
+  // pra cima, então nesse caso raro caímos de volta pro Profit/Loss Line
+  // (linha, que já lida com negativo colorindo de vermelho).
+  const evolucaoTemNegativo = evolucao.some((p) => p.liquido < 0)
+
+  // Totais do período anterior (mesma duração, imediatamente antes de `de`)
+  // — vira a variação % nos cabeçalhos dos gráficos. Usa o mesmo critério de
+  // "overlap" que os cards do topo (não o de check-in da série acima), pra
+  // comparar maçã com maçã com o Valor Bruto/Líquido já mostrados ali.
+  const periodoAnterior = React.useMemo(() => {
+    if (!de || !ate) return null
+    const inicio = new Date(`${de}T00:00:00`)
+    const fim = new Date(`${ate}T00:00:00`)
+    const duracaoDias = Math.round((fim.getTime() - inicio.getTime()) / 86400000) + 1
+    const fimAnterior = new Date(inicio.getTime() - 86400000)
+    const inicioAnterior = new Date(fimAnterior.getTime() - (duracaoDias - 1) * 86400000)
+    const deAnterior = chaveDia(inicioAnterior)
+    const ateAnterior = chaveDia(fimAnterior)
+
+    let candidatas = reservas.filter((r) => r.status !== "cancelada" && r.checkout > deAnterior && r.checkin <= ateAnterior)
+    if (casaFiltro !== todasValue) candidatas = candidatas.filter((r) => r.casa_id === Number(casaFiltro))
+
+    const bruto = candidatas.reduce((s, r) => s + valorBrutoEfetivo(r), 0)
+    const taxas = candidatas.reduce((s, r) => s + comissaoPlataformaEfetiva(r) + (Number(r.comissao_marcio) || 0), 0)
+    return { bruto, liquido: bruto - taxas }
+  }, [reservas, casaFiltro, de, ate])
+
+  function variacaoPct(atual: number, anterior: number | undefined): number | null {
+    if (!anterior) return null
+    return ((atual - anterior) / anterior) * 100
+  }
 
   // Fatias do donut de Comissão Marcio Filho — sempre por plataforma (é a
   // identidade que dá cor à fatia via PLATFORM_COLOR, a mesma usada nos
@@ -404,49 +526,51 @@ export function GanhosPage({ casas, reservas, casaAtualId }: GanhosPageProps) {
             <GanhosCard index={6} label="Descontos" value={formatBRL(resultado.descontoTotal)} />
           </div>
 
-          {/* Evolução no período — Area Chart (bruto) e Profit/Loss Line
-              (líquido, verde acima de zero / vermelho abaixo), componentes
-              Bklit instalados via Uilora. Some com menos de 2 pontos (não dá
-              pra desenhar uma linha com 1 dia só). */}
+          {/* Evolução no período — um ponto por dia de check-in (não
+              espalhado pelas noites), pra cada pico corresponder a uma
+              reserva de verdade e o tooltip poder explicar de onde veio.
+              Bruto em Area Chart, Líquido em Bar Chart (linha ficava "seca"
+              com dado pontual — cai pra Profit/Loss Line só no caso raro de
+              líquido negativo, que o Bar Chart da Bklit não desenha).
+              Some com menos de 2 pontos (não dá pra desenhar com 1 dia só). */}
           {evolucao.length > 1 && (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-section-title text-foreground/80">Bruto no período</CardTitle>
-                </CardHeader>
                 <CardContent>
+                  <KpiHeader label="Total Bruto no período" valor={resultado.valorBruto} variacaoPct={variacaoPct(resultado.valorBruto, periodoAnterior?.bruto)} />
                   <AreaChart data={evolucao} xDataKey="date" aspectRatio="16 / 9">
                     <Grid horizontal />
                     <Area dataKey="bruto" fill="var(--chart-line-primary)" />
                     <XAxis />
-                    <ChartTooltip
-                      rows={(point: Record<string, unknown>) => [
-                        { color: "var(--chart-line-primary)", label: "Bruto", value: formatBRL(point.bruto as number) },
-                      ]}
-                    />
+                    <ChartTooltip content={({ point }) => <EvolucaoTooltipContent point={point} />} />
                   </AreaChart>
                 </CardContent>
               </Card>
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-section-title text-foreground/80">Líquido no período</CardTitle>
-                </CardHeader>
                 <CardContent>
-                  <LineChart data={evolucao} xDataKey="date" aspectRatio="16 / 9">
-                    <Grid highlightRowValues={[0]} horizontal />
-                    <ProfitLossLine dataKey="liquido" />
-                    <XAxis />
-                    <ChartTooltip
-                      indicatorColor={(point: Record<string, unknown>) => profitLossColor((point.liquido as number) ?? 0)}
-                      rows={(point: Record<string, unknown>) => [
-                        {
-                          color: profitLossColor((point.liquido as number) ?? 0),
-                          label: "Líquido",
-                          value: formatBRL(point.liquido as number),
-                        },
-                      ]}
-                    />
-                  </LineChart>
+                  <KpiHeader
+                    label="Total Líquido no período"
+                    valor={resultado.valorLiquido}
+                    variacaoPct={variacaoPct(resultado.valorLiquido, periodoAnterior?.liquido)}
+                  />
+                  {evolucaoTemNegativo ? (
+                    <LineChart data={evolucao} xDataKey="date" aspectRatio="16 / 9">
+                      <Grid highlightRowValues={[0]} horizontal />
+                      <ProfitLossLine dataKey="liquido" />
+                      <XAxis />
+                      <ChartTooltip
+                        content={({ point }) => <EvolucaoTooltipContent point={point} />}
+                        indicatorColor={(point: Record<string, unknown>) => profitLossColor((point.liquido as number) ?? 0)}
+                      />
+                    </LineChart>
+                  ) : (
+                    <BarChart data={evolucao} xDataKey="date" aspectRatio="16 / 9">
+                      <Grid horizontal />
+                      <Bar dataKey="liquido" fill="var(--color-emerald-500)" />
+                      <BarXAxis />
+                      <ChartTooltip content={({ point }) => <EvolucaoTooltipContent point={point} />} />
+                    </BarChart>
+                  )}
                 </CardContent>
               </Card>
             </div>
