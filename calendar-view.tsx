@@ -8,6 +8,7 @@ import {
   PrintReportLegend,
   PrintReportSummary,
 } from "@/components/calendar-print-report"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { corDaCasa } from "@/lib/colors"
 import { abreviarNome, formatBRLCompacto, formatDiaMes } from "@/lib/format"
 import { PLATFORM_COLOR } from "@/lib/platform"
@@ -19,6 +20,10 @@ const DOWS = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"]
 const MAX_CARDS_POR_DIA = 2
 // Quantos avisos de saída (check-out) mostrar antes de resumir em "+N"
 const MAX_SAIDAS_POR_DIA = 3
+// Quantas trilhas de estadia empilhar antes de resumir em "+N" — na prática
+// só passa de 1 quando há reservas de casas diferentes se sobrepondo no
+// modo "todas as casas".
+const MAX_FAIXAS_POR_DIA = 3
 
 // Quantos meses o feed já nasce carregado (antes/depois do mês atual) e até
 // onde a rolagem infinita pode esticar o range — evita crescer pra sempre
@@ -50,13 +55,17 @@ interface ReservaDayCardProps {
   modoTodasCasas: boolean
   selected: boolean
   onSelect: () => void
+  /** Avisa quando o mouse entra/sai do card — o calendário usa isso pra
+   *  acender a trilha da estadia nos outros dias dessa mesma reserva, sem
+   *  precisar clicar (ver `hoveredReservaId` em CalendarView). */
+  onHover: (hovering: boolean) => void
 }
 
 // Único lugar da UI onde a cor da casa/plataforma ainda aparece: uma faixa
 // fina na lateral esquerda do card, não mais barras cobrindo o topo do dia
 // nem o avatar inteiro tingido — a cor vira um indicador pequeno, não o
 // elemento dominante do card.
-function ReservaDayCard({ reserva, casas, modoTodasCasas, selected, onSelect }: ReservaDayCardProps) {
+function ReservaDayCard({ reserva, casas, modoTodasCasas, selected, onSelect, onHover }: ReservaDayCardProps) {
   const cor = modoTodasCasas
     ? corDaCasa(casas, reserva.casa_id)
     : PLATFORM_COLOR[reserva.plataforma] || PLATFORM_COLOR.Outro
@@ -67,6 +76,10 @@ function ReservaDayCard({ reserva, casas, modoTodasCasas, selected, onSelect }: 
     <motion.button
       type="button"
       onClick={onSelect}
+      onMouseEnter={() => onHover(true)}
+      onMouseLeave={() => onHover(false)}
+      onFocus={() => onHover(true)}
+      onBlur={() => onHover(false)}
       whileHover={{ y: -1 }}
       transition={{ duration: 0.15 }}
       className={cn(
@@ -103,16 +116,22 @@ interface CheckoutBadgeProps {
   reserva: Reserva
   selected: boolean
   onSelect: () => void
+  /** Ver `ReservaDayCard.onHover` — mesmo mecanismo. */
+  onHover: (hovering: boolean) => void
 }
 
 // Uma linha discreta, não mais um card vermelho — o vermelho aqui é só um
 // tom de texto suave, pra sinalizar "casa libera hoje" sem competir com os
 // cards de check-in.
-function CheckoutBadge({ reserva, selected, onSelect }: CheckoutBadgeProps) {
+function CheckoutBadge({ reserva, selected, onSelect, onHover }: CheckoutBadgeProps) {
   return (
     <button
       type="button"
       onClick={onSelect}
+      onMouseEnter={() => onHover(true)}
+      onMouseLeave={() => onHover(false)}
+      onFocus={() => onHover(true)}
+      onBlur={() => onHover(false)}
       className={cn(
         "flex w-full min-w-0 items-baseline gap-1 rounded-md px-1.5 py-0.5 text-left transition-colors print:px-1 print:py-0",
         selected ? "bg-destructive/10 text-destructive" : "text-destructive/65 hover:bg-destructive/5"
@@ -128,6 +147,88 @@ function CheckoutBadge({ reserva, selected, onSelect }: CheckoutBadgeProps) {
   )
 }
 
+interface OcupacaoDia {
+  reserva: Reserva
+  /** Dia é o próprio check-in desta reserva. */
+  inicio: boolean
+  /** Dia é o próprio check-out desta reserva. */
+  fim: boolean
+}
+
+interface FaixaOcupacaoProps {
+  ocupacao: OcupacaoDia
+  casas: Casa[]
+  modoTodasCasas: boolean
+  /** true se a reserva está selecionada OU se o mouse está em cima dela em
+   *  QUALQUER dia/card dela — é o que faz a estadia inteira acender junto,
+   *  não só o dia sob o cursor. */
+  destacada: boolean
+  /** Só faz sentido escrever o nome por baixo da trilha quando ela está em
+   *  destaque — do contrário toda estadia longa repetiria o nome dia após
+   *  dia, virando poluição visual sem motivo. */
+  mostrarRotulo: boolean
+  onSelect: () => void
+  onHover: (hovering: boolean) => void
+}
+
+// A "trilha da estadia": um traço colorido que aparece em TODOS os dias em
+// que o hóspede está na casa, do check-in ao check-out — não só nas duas
+// pontas. É o que faz um dia "no meio" da estadia (sem card de entrada nem
+// de saída) deixar de ser um quadrado mudo: mesmo sem nenhum card, ele
+// mostra a cor da casa/plataforma, responde a clique (seleciona a reserva,
+// igual aos cards) e a passar o mouse (acende a estadia inteira, sem
+// precisar abrir nada) — e tem dica com nome e datas. Quando em destaque, a
+// trilha fica mais grossa e ganha sombra em todos os dias que ocupa — a
+// estadia inteira acende de uma vez, em vez de só os dois cartões de
+// entrada/saída.
+function FaixaOcupacao({ ocupacao, casas, modoTodasCasas, destacada, mostrarRotulo, onSelect, onHover }: FaixaOcupacaoProps) {
+  const { reserva, inicio, fim } = ocupacao
+  const cor = modoTodasCasas
+    ? corDaCasa(casas, reserva.casa_id)
+    : PLATFORM_COLOR[reserva.plataforma] || PLATFORM_COLOR.Outro
+  const nome = abreviarNome(reserva.hospede) || "(sem nome)"
+  const descricao = `${nome} · ${formatDiaMes(reserva.checkin)} → ${formatDiaMes(reserva.checkout)}${
+    inicio ? " (chegada)" : fim ? " (saída)" : ""
+  }`
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onSelect}
+          onMouseEnter={() => onHover(true)}
+          onMouseLeave={() => onHover(false)}
+          onFocus={() => onHover(true)}
+          onBlur={() => onHover(false)}
+          aria-label={descricao}
+          className="flex w-full min-w-0 flex-col items-start gap-0.5 print:gap-0"
+        >
+          <span
+            aria-hidden="true"
+            className={cn(
+              "block w-full rounded-full transition-[height,opacity,box-shadow] duration-150 print:rounded-[1px]",
+              destacada
+                ? "h-[6px] opacity-100 shadow-[0_1px_3px_rgba(0,0,0,0.4)] print:h-[2.5px] print:shadow-none"
+                : "h-[5px] opacity-40 hover:opacity-75 print:h-[2px]"
+            )}
+            style={{ backgroundColor: cor }}
+          />
+          {mostrarRotulo && (
+            <span
+              className="w-full truncate text-left text-[9px] leading-none font-semibold print:hidden"
+              style={{ color: cor }}
+            >
+              {nome}
+            </span>
+          )}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{descricao}</TooltipContent>
+    </Tooltip>
+  )
+}
+
 interface MonthSectionProps {
   mes: Date
   sectionRef: (el: HTMLElement | null) => void
@@ -136,6 +237,11 @@ interface MonthSectionProps {
   modoTodasCasas: boolean
   selectedReservaId: number | null
   onSelectReserva: (id: number) => void
+  /** Reserva sob o mouse agora (em qualquer dia/card dela) — acende a
+   *  trilha da estadia inteira sem precisar clicar. `null` quando nada está
+   *  sob o mouse. */
+  hoveredReservaId: number | null
+  onHoverReserva: (id: number | null) => void
   /** Único mês que sobrevive na impressão — os demais somem via `print:hidden`
    *  (o feed continua rolando normalmente na tela, só o papel filtra). */
   ativoNaImpressao: boolean
@@ -152,6 +258,8 @@ function MonthSection({
   modoTodasCasas,
   selectedReservaId,
   onSelectReserva,
+  hoveredReservaId,
+  onHoverReserva,
   ativoNaImpressao,
   nomeUnidadeImpressao,
 }: MonthSectionProps) {
@@ -173,9 +281,23 @@ function MonthSection({
 
     const lista = Array.from({ length: totalDias }, (_, i) => {
       const d = new Date(ano, mesIdx, i + 1)
-      const checkins = ativas.filter((r) => new Date(r.checkin + "T00:00:00").getTime() === d.getTime())
-      const checkouts = ativas.filter((r) => new Date(r.checkout + "T00:00:00").getTime() === d.getTime())
-      return { data: d, isToday: d.getTime() === hoje.getTime(), checkins, checkouts }
+      const dTime = d.getTime()
+      const checkins = ativas.filter((r) => new Date(r.checkin + "T00:00:00").getTime() === dTime)
+      const checkouts = ativas.filter((r) => new Date(r.checkout + "T00:00:00").getTime() === dTime)
+
+      // Toda reserva "em andamento" nesse dia (do check-in ao check-out,
+      // incluindo as duas pontas) — não só quem chega ou sai hoje. É essa
+      // lista que alimenta a trilha colorida contínua (ver FaixaOcupacao).
+      const ocupacoes: (OcupacaoDia & { checkinTime: number })[] = []
+      for (const r of ativas) {
+        const checkinTime = new Date(r.checkin + "T00:00:00").getTime()
+        const checkoutTime = new Date(r.checkout + "T00:00:00").getTime()
+        if (dTime < checkinTime || dTime > checkoutTime) continue
+        ocupacoes.push({ reserva: r, inicio: dTime === checkinTime, fim: dTime === checkoutTime, checkinTime })
+      }
+      ocupacoes.sort((a, b) => a.checkinTime - b.checkinTime || a.reserva.id - b.reserva.id)
+
+      return { data: d, isToday: dTime === hoje.getTime(), checkins, checkouts, ocupacoes }
     })
 
     return { dias: lista, primeiroDiaSemana: primeiro }
@@ -263,6 +385,30 @@ function MonthSection({
               >
                 {dia.data.getDate()}
               </span>
+              {dia.ocupacoes.length > 0 && (
+                <div className="flex flex-col gap-[3px] print:gap-[1px]">
+                  {dia.ocupacoes.slice(0, MAX_FAIXAS_POR_DIA).map((oc) => {
+                    const destacada = oc.reserva.id === selectedReservaId || oc.reserva.id === hoveredReservaId
+                    return (
+                      <FaixaOcupacao
+                        key={`ocup-${oc.reserva.id}`}
+                        ocupacao={oc}
+                        casas={casas}
+                        modoTodasCasas={modoTodasCasas}
+                        destacada={destacada}
+                        mostrarRotulo={destacada && !oc.inicio && !oc.fim}
+                        onSelect={() => onSelectReserva(oc.reserva.id)}
+                        onHover={(hovering) => onHoverReserva(hovering ? oc.reserva.id : null)}
+                      />
+                    )
+                  })}
+                  {dia.ocupacoes.length > MAX_FAIXAS_POR_DIA && (
+                    <span className="px-1 text-[9px] text-muted-foreground print:hidden">
+                      +{dia.ocupacoes.length - MAX_FAIXAS_POR_DIA}
+                    </span>
+                  )}
+                </div>
+              )}
               {dia.checkins.length > 0 && (
                 <div className="flex flex-col gap-1 print:gap-0.5">
                   {dia.checkins.slice(0, MAX_CARDS_POR_DIA).map((r) => (
@@ -273,6 +419,7 @@ function MonthSection({
                       modoTodasCasas={modoTodasCasas}
                       selected={r.id === selectedReservaId}
                       onSelect={() => onSelectReserva(r.id)}
+                      onHover={(hovering) => onHoverReserva(hovering ? r.id : null)}
                     />
                   ))}
                   {dia.checkins.length > MAX_CARDS_POR_DIA && (
@@ -290,6 +437,7 @@ function MonthSection({
                       reserva={r}
                       selected={r.id === selectedReservaId}
                       onSelect={() => onSelectReserva(r.id)}
+                      onHover={(hovering) => onHoverReserva(hovering ? r.id : null)}
                     />
                   ))}
                   {dia.checkouts.length > MAX_SAIDAS_POR_DIA && (
@@ -356,6 +504,11 @@ export const CalendarView = React.forwardRef<CalendarViewHandle, CalendarViewPro
   ref
 ) {
   const hoje0 = React.useMemo(() => startOfMonth(new Date()), [])
+  // Reserva sob o mouse agora — vive só aqui dentro (não sobe pro dashboard)
+  // porque é puramente visual: acende a trilha da estadia em todos os dias
+  // dela enquanto o cursor passa por cima de qualquer card/trilha, mesmo sem
+  // clicar. Ver FaixaOcupacao.
+  const [hoveredReservaId, setHoveredReservaId] = React.useState<number | null>(null)
   const [meses, setMeses] = React.useState<Date[]>(() => {
     const arr: Date[] = []
     for (let i = -MESES_INICIAIS_PASSADO; i <= MESES_INICIAIS_FUTURO; i++) arr.push(addMonths(hoje0, i))
@@ -495,6 +648,8 @@ export const CalendarView = React.forwardRef<CalendarViewHandle, CalendarViewPro
             modoTodasCasas={modoTodasCasas}
             selectedReservaId={selectedReservaId}
             onSelectReserva={onSelectReserva}
+            hoveredReservaId={hoveredReservaId}
+            onHoverReserva={setHoveredReservaId}
             ativoNaImpressao={mesAtivoImpressao ? isSameMonth(mes, mesAtivoImpressao) : false}
             nomeUnidadeImpressao={nomeUnidadeImpressao ?? "Todas as casas"}
           />
@@ -520,6 +675,7 @@ export const CalendarView = React.forwardRef<CalendarViewHandle, CalendarViewPro
           <span className="size-2 rounded-full bg-destructive/60" />
           Saída (check-out)
         </span>
+        <span className="text-muted-foreground/70">Toque numa trilha colorida para ver a estadia completa</span>
       </div>
     </div>
   )
