@@ -5,6 +5,7 @@ import { ArrowUp, BellRing, ChevronLeft, ChevronRight, Home as HomeIcon, ListChe
 import { AlertasPanel } from "@/components/alertas-panel"
 import { CalendarView, type CalendarViewHandle } from "@/components/calendar-view"
 import { NovaReservaDialog } from "@/components/nova-reserva-dialog"
+import { RelatorioFinanceiroDialog } from "@/components/relatorio-financeiro-dialog"
 import { ReservaSelecionadaPanel } from "@/components/reserva-selecionada-panel"
 import { ReservasSection } from "@/components/reservas-section"
 import { SummaryCards } from "@/components/summary-cards"
@@ -164,6 +165,7 @@ export function DashboardPage({ data, onOpenCasas, onEditReserva, hojeSignal, on
               <Printer className="size-4" />
               <span className="sr-only">Imprimir / Exportar PDF</span>
             </Button>
+            <RelatorioFinanceiroDialog casas={data.casas} reservas={data.reservas} />
             <NovaReservaDialog
               casas={data.casas}
               casaAtualId={data.casaAtualId}
