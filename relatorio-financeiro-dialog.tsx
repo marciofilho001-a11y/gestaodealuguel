@@ -1,6 +1,6 @@
 // Botão "Relatório financeiro" do cabeçalho + o painel de filtros que monta o
-// PDF. O documento em si está em relatorio-financeiro-print.tsx; aqui só se
-// escolhe O QUE entra nele.
+// PDF. O documento em si é desenhado em relatorio-financeiro-pdf.ts; aqui só
+// se escolhe O QUE entra nele.
 //
 // Por que a seleção de reservas mora aqui e não na tabela: o escopo pedia
 // "gerar de todas as reservas ou apenas das selecionadas". Espalhar checkbox
@@ -8,16 +8,15 @@
 // seleção acontece dentro do próprio painel, sobre a lista já filtrada pelo
 // período. Tudo nasce marcado; desmarcar é a exceção.
 //
-// A impressão usa o mecanismo nativo do navegador (window.print() → "Salvar
-// como PDF"), igual ao que o calendário já fazia. É de propósito: sai texto
-// vetorial de verdade, selecionável e nítido em qualquer zoom, sem somar
-// biblioteca nenhuma ao bundle (que já passa de 1,4 MB).
+// O PDF é gerado direto (arquivo baixado), e não pela impressão do navegador:
+// assim a folha é sempre A4 retrato, sem cabeçalho/rodapé do navegador e igual
+// em qualquer aparelho. O gerador (jsPDF + fontes) é carregado sob demanda,
+// só no clique em "Gerar PDF", então não pesa no carregamento do app.
 
 import * as React from "react"
-import { createPortal } from "react-dom"
 import { Check, FileText, Loader2 } from "lucide-react"
+import { toast } from "sonner"
 
-import { RelatorioFinanceiroDocumento } from "@/components/relatorio-financeiro-print"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -33,12 +32,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { formatBRL, formatDate, primeiroDiaMes, ultimoDiaMes } from "@/lib/format"
 import { PLATFORM_COLOR } from "@/lib/platform"
-import {
-  calcularTotais,
-  filtrarReservas,
-  montarLinha,
-  type LinhaRelatorio,
-} from "@/lib/relatorio-financeiro"
+import { calcularTotais, filtrarReservas, montarLinha } from "@/lib/relatorio-financeiro"
 import { cn } from "@/lib/utils"
 import type { Casa, Reserva } from "@/types"
 
@@ -60,17 +54,6 @@ export function RelatorioFinanceiroDialog({ casas, reservas }: RelatorioFinancei
   const [excluidas, setExcluidas] = React.useState<Set<number>>(new Set())
   const [incluirMarcio, setIncluirMarcio] = React.useState(true)
   const [gerando, setGerando] = React.useState(false)
-
-  // Estado do documento a imprimir. Enquanto for null, nada é renderizado no
-  // portal — o DOM do relatório só existe no instante da impressão.
-  const [documento, setDocumento] = React.useState<null | {
-    linhas: LinhaRelatorio[]
-    de: string
-    ate: string
-    nomeCasa: string
-    nomePlataforma: string
-    mostrarMarcio: boolean
-  }>(null)
 
   const candidatas = React.useMemo(
     () =>
@@ -128,45 +111,30 @@ export function RelatorioFinanceiroDialog({ casas, reservas }: RelatorioFinancei
     })
   }
 
-  function gerar() {
-    if (linhas.length === 0) return
+  async function gerar() {
+    if (linhas.length === 0 || gerando) return
     setGerando(true)
-    // Fecha o painel antes de imprimir: some da tela e, principalmente, tira
-    // o portal do Radix do caminho da folha.
-    setOpen(false)
-    setDocumento({
-      linhas,
-      de,
-      ate,
-      nomeCasa: casaFiltro === TODAS ? "Todas as casas" : (casas.find((c) => String(c.id) === casaFiltro)?.nome ?? "—"),
-      nomePlataforma: plataformaFiltro === TODAS ? "Todas as plataformas" : plataformaFiltro,
-      mostrarMarcio: incluirMarcio && temComissaoMarcio,
-    })
-  }
-
-  // Dispara a impressão só depois que o portal pintou. Dois requestAnimationFrame
-  // encadeados: o primeiro garante que o React já commitou o DOM, o segundo que
-  // o navegador já desenhou — window.print() trava a thread, então imprimir cedo
-  // demais sairia com a folha em branco.
-  React.useEffect(() => {
-    if (!documento) return
-
-    const encerrar = () => {
-      document.body.removeAttribute("data-print-mode")
-      setDocumento(null)
+    try {
+      // Import dinâmico: jsPDF e as fontes só baixam neste clique.
+      const { gerarRelatorioFinanceiroPdf } = await import("@/lib/relatorio-financeiro-pdf")
+      gerarRelatorioFinanceiroPdf({
+        linhas,
+        totais,
+        de,
+        ate,
+        nomeCasa: casaFiltro === TODAS ? "Todas as casas" : (casas.find((c) => String(c.id) === casaFiltro)?.nome ?? "—"),
+        nomePlataforma: plataformaFiltro === TODAS ? "Todas as plataformas" : plataformaFiltro,
+        mostrarMarcio: incluirMarcio && temComissaoMarcio,
+      })
+      setOpen(false)
+      toast.success("Relatório financeiro gerado")
+    } catch (erro) {
+      console.error("Falha ao gerar o PDF do relatório financeiro", erro)
+      toast.error("Não foi possível gerar o PDF. Tente de novo.")
+    } finally {
       setGerando(false)
     }
-
-    document.body.setAttribute("data-print-mode", "relatorio")
-    const id = requestAnimationFrame(() => requestAnimationFrame(() => window.print()))
-    window.addEventListener("afterprint", encerrar)
-
-    return () => {
-      cancelAnimationFrame(id)
-      window.removeEventListener("afterprint", encerrar)
-      document.body.removeAttribute("data-print-mode")
-    }
-  }, [documento])
+  }
 
   return (
     <>
@@ -182,7 +150,7 @@ export function RelatorioFinanceiroDialog({ casas, reservas }: RelatorioFinancei
           <DialogHeader>
             <DialogTitle>Relatório financeiro</DialogTitle>
             <DialogDescription>
-              Escolha o período e as reservas. O PDF sai com o detalhamento de cada hospedagem e os totais no fim.
+              Escolha o período e as reservas. O PDF (A4) é baixado com o detalhamento de cada hospedagem e os totais.
             </DialogDescription>
           </DialogHeader>
 
@@ -388,24 +356,6 @@ export function RelatorioFinanceiroDialog({ casas, reservas }: RelatorioFinancei
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* O documento vive fora do #root pra que a regra de impressão consiga
-          esconder o app inteiro e deixar só ele na folha. */}
-      {documento &&
-        createPortal(
-          <div id="relatorio-print-root">
-            <RelatorioFinanceiroDocumento
-              linhas={documento.linhas}
-              totais={calcularTotais(documento.linhas)}
-              de={documento.de}
-              ate={documento.ate}
-              nomeCasa={documento.nomeCasa}
-              nomePlataforma={documento.nomePlataforma}
-              mostrarMarcio={documento.mostrarMarcio}
-            />
-          </div>,
-          document.body,
-        )}
     </>
   )
 }

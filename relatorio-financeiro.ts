@@ -147,9 +147,9 @@ export function calcularTotais(linhas: LinhaRelatorio[]): TotaisRelatorio {
 /** "1º de janeiro de 2027 a 31 de janeiro de 2027" — legenda do cabeçalho */
 export function rotularPeriodo(de: string, ate: string): string {
   const fmt = (iso: string) =>
-    new Date(`${iso}T00:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })
+    new Date(`${iso}T00:00:00`).toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" })
   if (!de && !ate) return "Todo o histórico"
   if (!de) return `Até ${fmt(ate)}`
   if (!ate) return `A partir de ${fmt(de)}`
-  return `${fmt(de)} — ${fmt(ate)}`
+  return `${fmt(de)} a ${fmt(ate)}`
 }
