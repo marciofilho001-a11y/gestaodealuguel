@@ -9,8 +9,14 @@
 // e o arquivo sai idêntico em qualquer computador ou celular.
 //
 // Toda medida está em milímetros. Este arquivo só é carregado (import
-// dinâmico) quando o usuário clica em "Gerar PDF", então a biblioteca jsPDF e
-// as fontes não pesam no carregamento normal do app.
+// dinâmico) quando o usuário clica em "Gerar PDF", então a biblioteca jsPDF, as
+// fontes e as fotos não pesam no carregamento normal do app.
+//
+// Peças que compõem o documento (todas carregadas junto com este arquivo):
+//  - relatorio-financeiro-fontes.ts   fonte IBM Plex Sans embutida
+//  - relatorio-financeiro-imagens.ts  fotos das casas (miniaturas JPEG)
+//  - relatorio-financeiro-icones.ts   ícones (dados; gerado a partir do Lucide)
+//  - relatorio-financeiro-vetor.ts    desenha os ícones como vetor no PDF
 //
 // Os NÚMEROS não são calculados aqui: vêm prontos de lib/relatorio-financeiro.ts
 // (mesma fonte do Setor de Ganhos). Este arquivo só decide onde cada coisa cai
@@ -25,6 +31,9 @@ import {
   type TotaisRelatorio,
 } from "@/lib/relatorio-financeiro"
 import { PLEX_BOLD, PLEX_REGULAR, PLEX_SEMIBOLD } from "@/lib/relatorio-financeiro-fontes"
+import type { NomeIcone } from "@/lib/relatorio-financeiro-icones"
+import { FOTO_CASA_CINZA, FOTO_CASA_LARANJA } from "@/lib/relatorio-financeiro-imagens"
+import { desenharIcone } from "@/lib/relatorio-financeiro-vetor"
 
 export interface DadosRelatorioPdf {
   linhas: LinhaRelatorio[]
@@ -49,9 +58,16 @@ const BOTTOM = PAGE_H - 20 // nada de conteúdo abaixo disto (sobra espaço pro 
 const CONT_TOP = 22 // onde o conteúdo recomeça nas páginas 2, 3...
 const PT_POR_MM = 72 / 25.4
 
-const HEAD_H = 7.5 // altura do cabeçalho da tabela
-const ROW_H = 13.6 // altura de cada reserva (3 linhas de texto)
-const RIGHT_PAD = 2.2 // respiro à direita das colunas numéricas
+const HEAD_H = 8.4 // altura da faixa de títulos das colunas
+const CARD_H = 17.6 // altura de cada cartão de reserva
+const CARD_GAP = 2.2 // espaço entre cartões
+const CARD_R = 2.8 // raio dos cantos do cartão
+const PITCH = CARD_H + CARD_GAP // de um cartão ao seguinte
+const THUMB_W = 17.7 // foto da casa (mesma proporção do recorte: 288 x 212 px)
+const THUMB_H = 13
+const THUMB_X = 4.4 // distância da foto até a borda esquerda do cartão
+const PILL_H = 10.6 // altura do selo verde do líquido
+const RIGHT_PAD = 1.8 // respiro à direita das colunas numéricas
 
 // ---------------------------------------------------------------------------
 // Cores — as do app (index.css), com o teal um tom mais escuro nos textos
@@ -71,6 +87,13 @@ const COR = {
   ouroFundo: [245, 233, 208] as RGB,
   ouroTexto: [92, 68, 19] as RGB,
   branco: [255, 255, 255] as RGB,
+  vermelho: [204, 34, 44] as RGB, // deduções (comissão, desconto): 5,7:1 no branco
+  sombra: [238, 239, 242] as RGB, // "sombra" do cartão
+  bordaCartao: [226, 228, 233] as RGB,
+  bordaFoto: [214, 217, 222] as RGB,
+  faixaCabecalho: [246, 247, 249] as RGB,
+  filete: [234, 236, 240] as RGB, // divisores verticais dentro do cartão
+  iconeSuave: [161, 161, 170] as RGB, // ícones decorativos (setinha, foto vazia)
 }
 
 // ---------------------------------------------------------------------------
@@ -284,135 +307,305 @@ function desenharCabecalhoContinuacao(doc: jsPDF, periodo: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Tabela de reservas
+// Detalhamento por reserva: cabeçalho da seção + cartões (um por reserva)
 // ---------------------------------------------------------------------------
 
-type ChaveColuna = "reserva" | "diarias" | "limpeza" | "desconto" | "bruto" | "comissao" | "liquido"
+/**
+ * Cada casa tem uma foto no cartão. As fotos foram enviadas pelo dono do app e
+ * são ligadas às casas pelo NOME (sem acento e sem diferenciar maiúscula):
+ *  - "Morrinhos"  → casa laranja
+ *  - "Vila"       → sobrado cinza (Residencial da Vila 2, 3, ...)
+ * Casa nova, com outro nome, ganha um quadradinho neutro com o ícone de casa.
+ */
+function fotoDaCasa(nome: string | undefined): { alias: string; dados: string } | null {
+  if (!nome) return null
+  const n = nome.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+  if (n.includes("morrinhos")) return { alias: "foto-casa-laranja", dados: FOTO_CASA_LARANJA }
+  if (n.includes("vila")) return { alias: "foto-casa-cinza", dados: FOTO_CASA_CINZA }
+  return null
+}
 
-interface Coluna {
-  chave: ChaveColuna
+type ChaveNumerica = "diarias" | "limpeza" | "desconto" | "bruto" | "comissao"
+
+interface ColunaNumerica {
+  chave: ChaveNumerica
   rotulo: string
+  icone: NomeIcone
+  /** largura da coluna */
   w: number
-  x: number
+  /** borda direita (coordenada absoluta) — os números se alinham por ela */
+  dir: number
+}
+
+interface Layout {
+  colunas: ColunaNumerica[]
+  comDesconto: boolean
+  pillX: number
+  pillW: number
+  pillFonte: number
+  textoX: number
+  textoW: number
+  /** x dos filetes verticais que separam os grupos dentro do cartão */
+  divisores: number[]
 }
 
 // A coluna "Desconto" só existe quando alguma reserva do relatório teve
-// desconto ao hóspede — coluna cheia de traços é ruído.
-function montarColunas(comDesconto: boolean): Coluna[] {
-  const base: [ChaveColuna, string, number][] = comDesconto
+// desconto ao hóspede — coluna cheia de traços é ruído. Quando existe, tudo
+// fica um pouco mais apertado pra ela caber sem espremer o nome da casa.
+function montarLayout(comDesconto: boolean): Layout {
+  const pillW = comDesconto ? 24 : 26.5
+  const pillX = M + CW - 7.6 - pillW
+  const defs: [ChaveNumerica, string, NomeIcone, number][] = comDesconto
     ? [
-        ["reserva", "RESERVA", 58],
-        ["diarias", "DIÁRIAS", 22],
-        ["limpeza", "LIMPEZA", 17],
-        ["desconto", "DESCONTO", 17],
-        ["bruto", "BRUTO", 21],
-        ["comissao", "COMISSÃO", 20],
-        ["liquido", "LÍQUIDO", 23],
+        ["diarias", "DIÁRIAS", "calendario", 15.4],
+        ["limpeza", "LIMPEZA", "brilho", 14.6],
+        ["desconto", "DESCONTO", "etiqueta", 16.2],
+        ["bruto", "BRUTO", "recibo", 14.4],
+        ["comissao", "COMISSÃO", "percentual", 17],
       ]
     : [
-        ["reserva", "RESERVA", 66],
-        ["diarias", "DIÁRIAS", 24],
-        ["limpeza", "LIMPEZA", 18],
-        ["bruto", "BRUTO", 22],
-        ["comissao", "COMISSÃO", 22],
-        ["liquido", "LÍQUIDO", 26],
+        ["diarias", "DIÁRIAS", "calendario", 16],
+        ["limpeza", "LIMPEZA", "brilho", 15.2],
+        ["bruto", "BRUTO", "recibo", 15],
+        ["comissao", "COMISSÃO", "percentual", 17.2],
       ]
-  let x = M
-  return base.map(([chave, rotulo, w]) => {
-    const c: Coluna = { chave, rotulo, w, x }
-    x += w
-    return c
-  })
-}
 
-function desenharCabecalhoTabela(doc: jsPDF, cols: Coluna[], y: number) {
-  const liq = cols.find((c) => c.chave === "liquido")
-  if (liq) retangulo(doc, liq.x, y, liq.w, HEAD_H, COR.tealFundo)
-
-  for (const c of cols) {
-    const o: OpcoesTexto = {
-      peso: "semibold",
-      tamanho: 6.2,
-      tracking: 0.12,
-      cor: c.chave === "liquido" ? COR.teal : COR.suave,
-    }
-    if (c.chave === "reserva") texto(doc, c.rotulo, c.x + 3.4, y + 5, o)
-    else texto(doc, c.rotulo, c.x + c.w - RIGHT_PAD, y + 5, { ...o, align: "right" })
+  // Monta da direita para a esquerda, a partir do selo do líquido
+  const colunas: ColunaNumerica[] = []
+  let dir = pillX - 2.6
+  for (let i = defs.length - 1; i >= 0; i--) {
+    const [chave, rotulo, icone, w] = defs[i]
+    colunas.unshift({ chave, rotulo, icone, w, dir })
+    dir -= w
   }
-  regua(doc, M, M + CW, y + HEAD_H, COR.tinta, 0.3)
+  const numerosX = dir // borda esquerda da primeira coluna numérica
+  const textoX = M + THUMB_X + THUMB_W + 3
+  const comissao = colunas[colunas.length - 1]
+
+  return {
+    colunas,
+    comDesconto,
+    pillX,
+    pillW,
+    pillFonte: comDesconto ? 7.6 : 8,
+    textoX,
+    textoW: numerosX - 2.6 - textoX,
+    divisores: [numerosX - 1.3, comissao.dir - comissao.w],
+  }
 }
 
-function desenharLinha(doc: jsPDF, cols: Coluna[], l: LinhaRelatorio, y: number) {
-  const base = y + 4.9 // linha de base do texto principal — igual em todas as colunas
-  const sub = y + 8.5 // segunda linha (detalhe)
-  const terceira = y + 11.7
+/** Metade da altura de uma letra maiúscula: serve pra centralizar texto na vertical. */
+const meiaCaixaAlta = (tamanhoPt: number) => (0.35 * tamanhoPt) / PT_POR_MM
 
-  const liq = cols.find((c) => c.chave === "liquido")
-  if (liq) retangulo(doc, liq.x, y, liq.w, ROW_H, COR.tealFundo)
+function desenharSecaoDetalhe(doc: jsPDF, y: number, qtd: number, totalLiquido: number): number {
+  // Quadrinho com o ícone de calendário + título e legenda
+  const tile = 10.5
+  const iconeTile = 5.6
+  retangulo(doc, M, y + 0.5, tile, tile, COR.tealFundo, 2.8)
+  desenharIcone(doc, "calendario", M + (tile - iconeTile) / 2, y + 0.5 + (tile - iconeTile) / 2, iconeTile, COR.teal, 1.7)
+  const tx = M + tile + 3.4
+  texto(doc, "Detalhamento por Reserva", tx, y + 4.6, { peso: "bold", tamanho: 12.5, tracking: -0.005 })
+  texto(doc, `${plural(qtd, "reserva", "reservas")}  ·  Valores em R$`, tx, y + 9.2, {
+    tamanho: 7.6,
+    cor: COR.suave,
+  })
 
-  // Filete na cor da plataforma — mesma linguagem visual do calendário
-  const plataforma = capitalizar(l.reserva.plataforma || "Outro")
-  const corPlat = hexParaRgb(PLATFORM_COLOR[l.reserva.plataforma || "Outro"] ?? PLATFORM_COLOR.Outro)
-  retangulo(doc, M, y + 2.3, 0.9, ROW_H - 4.6, corPlat, 0.45)
+  // Selo do total líquido, à direita
+  const h = 11.5
+  const w = 58
+  const x = M + CW - w
+  retangulo(doc, x, y, w, h, COR.tealFundo, 3)
+  const icone = 6.2
+  desenharIcone(doc, "saco", x + 3.4, y + (h - icone) / 2, icone, COR.teal, 1.6)
+  const vx = x + 3.4 + icone + 2.6
+  texto(doc, "Total Líquido", vx, y + 4.5, { tamanho: 6.8, cor: COR.suave })
+  const valor = brl(totalLiquido)
+  const opc: OpcoesTexto = { peso: "bold", cor: COR.teal, tracking: -0.005 }
+  const tam = tamanhoQueCabe(doc, valor, { ...opc, tamanho: 11.5 }, x + w - 3 - vx)
+  texto(doc, valor, vx, y + 9.6, { ...opc, tamanho: tam })
 
-  for (const c of cols) {
-    const dir = c.x + c.w - RIGHT_PAD
-    const num = (s: string, o: OpcoesTexto = {}) =>
-      texto(doc, s, dir, base, {
-        tamanho: 8,
+  return y + h
+}
+
+function desenharCabecalhoTabela(doc: jsPDF, lay: Layout, y: number) {
+  doc.setFillColor(...COR.faixaCabecalho)
+  doc.setDrawColor(...COR.bordaCartao)
+  doc.setLineWidth(0.2)
+  doc.roundedRect(M, y, CW, HEAD_H, 2.4, 2.4, "FD")
+
+  const o: OpcoesTexto = { peso: "semibold", tamanho: 5.6, tracking: 0.07, cor: COR.suave }
+  const isz = 2.8
+  const iy = y + (HEAD_H - isz) / 2
+  const base = y + HEAD_H / 2 + meiaCaixaAlta(5.6)
+  const gap = 0.9
+
+  // RESERVA: alinhado com a foto do cartão
+  desenharIcone(doc, "casa", M + THUMB_X, iy, isz, COR.teal, 1.9)
+  texto(doc, "RESERVA", M + THUMB_X + isz + gap, base, o)
+
+  // Colunas numéricas: [ícone][rótulo], terminando na borda direita dos números
+  for (const c of lay.colunas) {
+    const xDir = c.dir - RIGHT_PAD
+    const w = texto(doc, c.rotulo, xDir, base, { ...o, align: "right" })
+    desenharIcone(doc, c.icone, xDir - w - gap - isz, iy, isz, COR.teal, 1.9)
+  }
+
+  // LÍQUIDO: centralizado sobre o selo verde dos cartões
+  const wl = medir(doc, "LÍQUIDO", o)
+  const xl = lay.pillX + (lay.pillW - (isz + gap + wl)) / 2
+  desenharIcone(doc, "pilha", xl, iy, isz, COR.teal, 1.9)
+  texto(doc, "LÍQUIDO", xl + isz + gap, base, { ...o, cor: COR.teal })
+}
+
+function desenharFoto(doc: jsPDF, nomeCasa: string | undefined, x: number, y: number) {
+  const foto = fotoDaCasa(nomeCasa)
+  doc.saveGraphicsState()
+  doc.roundedRect(x, y, THUMB_W, THUMB_H, 2, 2, null)
+  doc.clip()
+  doc.discardPath()
+  if (foto) {
+    doc.addImage(foto.dados, "JPEG", x, y, THUMB_W, THUMB_H, foto.alias)
+  } else {
+    retangulo(doc, x, y, THUMB_W, THUMB_H, COR.painel)
+    const s = 7
+    desenharIcone(doc, "casa", x + (THUMB_W - s) / 2, y + (THUMB_H - s) / 2, s, COR.iconeSuave, 1.5)
+  }
+  doc.restoreGraphicsState()
+
+  // Filete fino por cima, pra a foto não "vazar" no fundo branco
+  doc.setDrawColor(...COR.bordaFoto)
+  doc.setLineWidth(0.2)
+  doc.roundedRect(x, y, THUMB_W, THUMB_H, 2, 2, "S")
+}
+
+function desenharCartao(doc: jsPDF, lay: Layout, l: LinhaRelatorio, y: number) {
+  const chavePlat = l.reserva.plataforma || "Outro"
+  const corPlat = hexParaRgb(PLATFORM_COLOR[chavePlat] ?? PLATFORM_COLOR.Outro)
+
+  // Sombra suave + corpo branco com borda fina
+  retangulo(doc, M + 0.3, y + 0.6, CW - 0.6, CARD_H, COR.sombra, CARD_R)
+  doc.setFillColor(...COR.branco)
+  doc.setDrawColor(...COR.bordaCartao)
+  doc.setLineWidth(0.2)
+  doc.roundedRect(M, y, CW, CARD_H, CARD_R, CARD_R, "FD")
+
+  // Faixa lateral na cor da plataforma (recortada pelo contorno arredondado)
+  doc.saveGraphicsState()
+  doc.roundedRect(M, y, CW, CARD_H, CARD_R, CARD_R, null)
+  doc.clip()
+  doc.discardPath()
+  retangulo(doc, M, y, 1.9, CARD_H, corPlat)
+  doc.restoreGraphicsState()
+
+  // Filetes verticais entre os grupos (identidade | valores | comissão)
+  for (const dx of lay.divisores) {
+    doc.setDrawColor(...COR.filete)
+    doc.setLineWidth(0.2)
+    doc.line(dx, y + 3.2, dx, y + CARD_H - 3.2)
+  }
+
+  // Foto da casa
+  desenharFoto(doc, l.casa?.nome, M + THUMB_X, y + (CARD_H - THUMB_H) / 2)
+
+  // Identidade: nome, casa · plataforma, período
+  const x0 = lay.textoX
+  const isz = 3
+  const larg = lay.textoW
+  const l1 = y + 6.1
+  const l2 = y + 10.3
+  const l3 = y + 14.3
+  const nome = truncar(doc, capitalizar(l.reserva.hospede || "Hóspede não informado"), larg, {
+    peso: "semibold",
+    tamanho: 8.8,
+  })
+  texto(doc, nome, x0, l1, { peso: "semibold", tamanho: 8.8 })
+
+  const casa = l.casa ? capitalizar(l.casa.nome) : "Casa removida"
+  const plataforma = capitalizar(chavePlat)
+  desenharIcone(doc, "pino", x0, l2 - 2.35, isz, COR.teal, 1.9)
+  const linhaCasa = `${casa}  ·  ${plataforma}`
+  const tamCasa = tamanhoQueCabe(doc, linhaCasa, { tamanho: 6.8 }, larg - isz - 1.2)
+  texto(doc, truncar(doc, linhaCasa, larg - isz - 1.2, { tamanho: tamCasa }), x0 + isz + 1.2, l2, {
+    tamanho: tamCasa,
+    cor: COR.suave,
+  })
+
+  // Com a coluna "Desconto" o espaço é curto: a contagem de diárias já aparece
+  // na coluna Diárias ("5 × 600,00"), então sai daqui.
+  const datas = `${dataBR(l.reserva.checkin)} → ${dataBR(l.reserva.checkout)}`
+  const periodo = lay.comDesconto ? datas : `${datas}  ·  ${plural(l.noites, "diária", "diárias")}`
+  desenharIcone(doc, "calendarioSimples", x0, l3 - 2.35, isz, COR.teal, 1.9)
+  const tamPeriodo = tamanhoQueCabe(doc, periodo, { tamanho: 6.8 }, larg - isz - 1.2)
+  texto(doc, truncar(doc, periodo, larg - isz - 1.2, { tamanho: tamPeriodo }), x0 + isz + 1.2, l3, {
+    tamanho: tamPeriodo,
+    cor: COR.suave,
+  })
+
+  // Valores
+  const base = y + 8.2
+  const sub = y + 12
+  for (const c of lay.colunas) {
+    const dir = c.dir - RIGHT_PAD
+    const larguraMax = c.w - RIGHT_PAD - 0.4
+    const num = (s: string, o: OpcoesTexto = {}) => {
+      const opc: OpcoesTexto = { peso: "semibold", tamanho: 8, ...o }
+      const tam = tamanhoQueCabe(doc, s, opc, larguraMax)
+      texto(doc, s, dir, base, { ...opc, tamanho: tam, align: "right" })
+    }
+    const traco = () => texto(doc, "–", dir, base, { tamanho: 8, cor: COR.suave, align: "right" })
+    const legenda = (s: string) =>
+      texto(doc, s, dir, sub, {
+        tamanho: tamanhoQueCabe(doc, s, { tamanho: 6.4 }, larguraMax),
+        cor: COR.suave,
         align: "right",
-        ...o,
-        cor: s === "—" ? COR.suave : (o.cor ?? COR.tinta),
       })
-    const zeroOu = (v: number, f: (n: number) => string) => (v > 0 ? f(v) : "—")
 
     switch (c.chave) {
-      case "reserva": {
-        const x0 = c.x + 3.4
-        const larg = c.w - 3.4 - 2
-        const nome = truncar(doc, capitalizar(l.reserva.hospede || "Hóspede não informado"), larg, {
-          peso: "semibold",
-          tamanho: 8.6,
-        })
-        texto(doc, nome, x0, base, { peso: "semibold", tamanho: 8.6 })
-        const casa = l.casa ? capitalizar(l.casa.nome) : "Casa removida"
-        texto(doc, truncar(doc, `${casa}  ·  ${plataforma}`, larg, { tamanho: 7 }), x0, sub, {
-          tamanho: 7,
-          cor: COR.suave,
-        })
-        const periodo = `${dataBR(l.reserva.checkin)} → ${dataBR(l.reserva.checkout)}  ·  ${plural(l.noites, "diária", "diárias")}`
-        texto(doc, truncar(doc, periodo, larg, { tamanho: 7 }), x0, terceira, { tamanho: 7, cor: COR.suave })
-        break
-      }
       case "diarias":
-        num(zeroOu(l.subtotalDiarias, fmt))
-        texto(doc, `${l.noites} × ${fmt(l.diariaMedia)}`, dir, sub, { tamanho: 6.8, cor: COR.suave, align: "right" })
+        if (l.subtotalDiarias > 0) num(fmt(l.subtotalDiarias))
+        else traco()
+        legenda(`${l.noites} × ${fmt(l.diariaMedia)}`)
         break
       case "limpeza":
-        num(zeroOu(l.limpeza, fmt))
+        if (l.limpeza > 0) num(fmt(l.limpeza))
+        else traco()
         break
       case "desconto":
-        num(zeroOu(l.descontoHospede, menos))
+        if (l.descontoHospede > 0) num(menos(l.descontoHospede), { cor: COR.vermelho })
+        else traco()
         break
       case "bruto":
-        num(fmt(l.bruto), { peso: "semibold" })
+        num(fmt(l.bruto))
         break
-      case "comissao": {
-        num(zeroOu(l.comissaoPlataforma, menos))
-        if (l.comissaoPlataforma > 0 && l.bruto > 0) {
-          const pct = (l.comissaoPlataforma / l.bruto) * 100
-          const s = `${pct.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
-          texto(doc, s, dir, sub, { tamanho: 6.8, cor: COR.suave, align: "right" })
-        }
-        break
-      }
-      case "liquido":
-        num(fmt(l.liquido), { peso: "bold", tamanho: 8.8, cor: COR.teal })
+      case "comissao":
+        if (l.comissaoPlataforma > 0) {
+          num(menos(l.comissaoPlataforma), { cor: COR.vermelho })
+          if (l.bruto > 0) {
+            const pct = (l.comissaoPlataforma / l.bruto) * 100
+            legenda(`${pct.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`)
+          }
+        } else traco()
         break
     }
   }
 
-  regua(doc, M, M + CW, y + ROW_H)
+  // Selo verde com o líquido — o número que o relatório existe pra entregar
+  const py = y + (CARD_H - PILL_H) / 2
+  retangulo(doc, lay.pillX, py, lay.pillW, PILL_H, COR.tealFundo, 2.8)
+  const iconePill = 3.4
+  desenharIcone(doc, "pilha", lay.pillX + 2.4, y + (CARD_H - iconePill) / 2, iconePill, COR.teal, 1.9)
+  const valor = brl(l.liquido)
+  const opc: OpcoesTexto = { peso: "bold", cor: COR.teal }
+  const disponivel = lay.pillW - 2.4 - iconePill - 1.6 - 2.2
+  const tam = tamanhoQueCabe(doc, valor, { ...opc, tamanho: lay.pillFonte }, disponivel)
+  texto(doc, valor, lay.pillX + lay.pillW - 2.2, y + CARD_H / 2 + meiaCaixaAlta(tam), {
+    ...opc,
+    tamanho: tam,
+    align: "right",
+  })
+
+  // Setinha à direita
+  desenharIcone(doc, "seta", M + CW - 5.6, y + (CARD_H - 3.2) / 2, 3.2, COR.iconeSuave, 2)
 }
 
 // ---------------------------------------------------------------------------
@@ -422,19 +615,23 @@ function desenharLinha(doc: jsPDF, cols: Coluna[], l: LinhaRelatorio, y: number)
 interface LinhaTotal {
   rotulo: string
   valor: string
+  icone: NomeIcone
   forte?: boolean
 }
 
+// Mesmos ícones das colunas dos cartões: quem viu "Limpeza" com a faísca lá em
+// cima reconhece a mesma categoria aqui embaixo.
 function linhasDeTotais(t: TotaisRelatorio): LinhaTotal[] {
   const l: LinhaTotal[] = [
-    { rotulo: "Reservas", valor: String(t.totalReservas) },
-    { rotulo: "Diárias", valor: String(t.totalNoites) },
-    { rotulo: "Soma das diárias", valor: brl(t.totalSubtotalDiarias) },
+    { rotulo: "Reservas", valor: String(t.totalReservas), icone: "casa" },
+    { rotulo: "Diárias", valor: String(t.totalNoites), icone: "lua" },
+    { rotulo: "Soma das diárias", valor: brl(t.totalSubtotalDiarias), icone: "calendario" },
   ]
-  if (t.totalLimpeza > 0) l.push({ rotulo: "Taxas de limpeza", valor: brl(t.totalLimpeza) })
-  if (t.totalDescontoHospede > 0) l.push({ rotulo: "Descontos ao hóspede", valor: menosBrl(t.totalDescontoHospede) })
-  l.push({ rotulo: "Total bruto", valor: brl(t.totalBruto), forte: true })
-  l.push({ rotulo: "Comissões da plataforma", valor: menosBrl(t.totalComissaoPlataforma) })
+  if (t.totalLimpeza > 0) l.push({ rotulo: "Taxas de limpeza", valor: brl(t.totalLimpeza), icone: "brilho" })
+  if (t.totalDescontoHospede > 0)
+    l.push({ rotulo: "Descontos ao hóspede", valor: menosBrl(t.totalDescontoHospede), icone: "etiqueta" })
+  l.push({ rotulo: "Total bruto", valor: brl(t.totalBruto), icone: "recibo", forte: true })
+  l.push({ rotulo: "Comissões da plataforma", valor: menosBrl(t.totalComissaoPlataforma), icone: "percentual" })
   return l
 }
 
@@ -476,7 +673,8 @@ function desenharTotais(doc: jsPDF, y: number, t: TotaisRelatorio): number {
     if (r.forte) regua(doc, x0, x0 + w, ry, COR.tinta, 0.3)
     else if (i > 0) regua(doc, x0, x0 + w, ry)
     const base = ry + 4.4
-    texto(doc, r.rotulo, x0, base, {
+    desenharIcone(doc, r.icone, x0, ry + (TOTAL_ROW_H - 3.2) / 2, 3.2, COR.teal, 1.9)
+    texto(doc, r.rotulo, x0 + 5.2, base, {
       peso: r.forte ? "semibold" : "regular",
       tamanho: 8,
       cor: r.forte ? COR.tinta : COR.suave,
@@ -487,11 +685,12 @@ function desenharTotais(doc: jsPDF, y: number, t: TotaisRelatorio): number {
 
   ry += 4
   retangulo(doc, x0, ry, w, HERO_H, COR.teal, 2.2)
-  texto(doc, "TOTAL LÍQUIDO", x0 + 5, ry + 6.2, { peso: "semibold", tamanho: 6.6, cor: COR.branco, tracking: 0.14 })
-  texto(doc, "bruto menos comissões", x0 + 5, ry + 10.6, { tamanho: 6.4, cor: COR.tealTexto })
+  desenharIcone(doc, "saco", x0 + 4.6, ry + (HERO_H - 6.4) / 2, 6.4, COR.branco, 1.6)
+  texto(doc, "TOTAL LÍQUIDO", x0 + 13.4, ry + 6.2, { peso: "semibold", tamanho: 6.6, cor: COR.branco, tracking: 0.14 })
+  texto(doc, "bruto menos comissões", x0 + 13.4, ry + 10.6, { tamanho: 6.4, cor: COR.tealTexto })
   const valor = brl(t.totalLiquido)
   const opc: OpcoesTexto = { peso: "bold", cor: COR.branco, tracking: -0.01 }
-  const tamanho = tamanhoQueCabe(doc, valor, { ...opc, tamanho: 15 }, w - 46)
+  const tamanho = tamanhoQueCabe(doc, valor, { ...opc, tamanho: 15 }, w - 54)
   texto(doc, valor, x0 + w - 5, ry + 9.8, { ...opc, tamanho, align: "right" })
 
   return ry + HERO_H
@@ -557,7 +756,8 @@ function desenharFechamentoMarcio(doc: jsPDF, y: number, t: TotaisRelatorio): nu
   const fy = y + 10
   const h = 13
   retangulo(doc, M, fy, CW, h, COR.ouroFundo, 2.2)
-  texto(doc, "LÍQUIDO FINAL APÓS COMISSÃO", M + 5, fy + 8, {
+  desenharIcone(doc, "moedasMao", M + 4.6, fy + (h - 5.4) / 2, 5.4, COR.ouroTexto, 1.7)
+  texto(doc, "LÍQUIDO FINAL APÓS COMISSÃO", M + 12.4, fy + 8, {
     peso: "semibold",
     tamanho: 6.8,
     cor: COR.ouroTexto,
@@ -605,32 +805,33 @@ export function montarRelatorioPdf(d: DadosRelatorioPdf): jsPDF {
     creator: "Gestão de Aluguel",
   })
 
-  const cols = montarColunas(d.totais.totalDescontoHospede > 0)
+  const lay = montarLayout(d.totais.totalDescontoHospede > 0)
   const novaPagina = (): number => {
     doc.addPage()
     desenharCabecalhoContinuacao(doc, periodo)
     return CONT_TOP
   }
 
-  // Página 1: capa + resumo, depois a tabela
+  // Página 1: capa + resumo, depois o detalhamento em cartões
   let y = desenharCapa(doc, d, periodo, d.emitidoEm ?? new Date())
-  secao(doc, "DETALHAMENTO POR RESERVA", y, `${plural(d.linhas.length, "reserva", "reservas")}  ·  valores em R$`)
-  y += 3.4
-  desenharCabecalhoTabela(doc, cols, y)
-  y += HEAD_H
+  y = desenharSecaoDetalhe(doc, y, d.linhas.length, d.totais.totalLiquido) + 4.6
+  desenharCabecalhoTabela(doc, lay, y)
+  y += HEAD_H + 2.4
 
   for (const l of d.linhas) {
-    if (y + ROW_H > BOTTOM) {
+    // +0,6 = a "sombra" do cartão também não pode passar da margem
+    if (y + CARD_H + 0.6 > BOTTOM) {
       y = novaPagina()
-      desenharCabecalhoTabela(doc, cols, y)
-      y += HEAD_H
+      desenharCabecalhoTabela(doc, lay, y)
+      y += HEAD_H + 2.4
     }
-    desenharLinha(doc, cols, l, y)
-    y += ROW_H
+    desenharCartao(doc, lay, l, y)
+    y += PITCH
   }
 
-  // Totais consolidados (nunca partidos entre duas páginas)
-  y += 10
+  // Totais consolidados (nunca partidos entre duas páginas). O `y` já vem com o
+  // espaço entre cartões somado depois do último.
+  y += 8
   if (y + alturaTotais(d.totais) > BOTTOM) y = novaPagina()
   y = desenharTotais(doc, y, d.totais)
 
